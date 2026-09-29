@@ -4,6 +4,7 @@ import * as vault from './vault.js';
 import { emptyData, autoPlan, TYPE_META, logActivity } from './logic.js';
 import { parseQuickAdd } from './parse.js';
 import { closeModal, modalOpen, toast, logo, confetti } from './ui.js';
+import { forgetImages, uploadFiles } from './attach.js';
 import { VIEWS, NAV_ORDER, openItemEditor, openHelp } from './views.js';
 
 const root = document.getElementById('root');
@@ -17,6 +18,7 @@ const app = {
   saving: false,
   dirty: false,
   lastActivity: Date.now(),
+  pasteTarget: null, // set by whichever screenshot gallery is on screen
 
   classById(id) {
     return this.data.classes.find((c) => c.id === id);
@@ -86,6 +88,8 @@ const app = {
     this.data = null;
     this.viewState = {};
     this.focus = { running: false };
+    this.pasteTarget = null;
+    forgetImages();
     renderAuth('login', reason);
   },
 
@@ -384,7 +388,7 @@ async function enter(session) {
   if (!data) data = emptyData();
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
-  for (const key of ['classes', 'items', 'focusLog', 'activity']) data[key] ||= [];
+  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments']) data[key] ||= [];
   app.session = session;
   app.data = data;
   app.view = 'launch';
@@ -435,6 +439,7 @@ function renderShell() {
     ),
   );
 
+  if (!modalOpen()) app.pasteTarget = null;
   const main = el('main', { class: 'main' }, quickAddBar(keepQuick), VIEWS[app.view].render(app));
 
   const mobileNav = el(
@@ -537,6 +542,18 @@ function quickAddBar(keep) {
 }
 
 // ------------------------------------------------------------------ keyboard + auto-lock
+// Paste a screenshot anywhere: it goes to the gallery on screen, or to Files if there isn't one.
+document.addEventListener('paste', async (e) => {
+  if (!app.session) return;
+  const images = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+  if (!images.length) return;
+  e.preventDefault();
+  if (app.pasteTarget) return app.pasteTarget(images);
+  await uploadFiles(app, images, { kind: 'work' });
+  if (app.view === 'files') app.render();
+  else toast('Screenshot saved to Files', { action: 'View', onAction: () => app.go('files') });
+});
+
 document.addEventListener('keydown', (e) => {
   if (!app.session || modalOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
   const tag = document.activeElement?.tagName;

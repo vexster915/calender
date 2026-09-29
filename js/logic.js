@@ -30,6 +30,7 @@ export function emptyData() {
     items: [],
     focusLog: [],
     activity: [],
+    attachments: [],
   };
 }
 

@@ -17,6 +17,7 @@ It runs entirely in your browser and is hosted free on GitHub Pages. Everything 
 | 🗓 **Month heat map** | Each day is tinted by workload, and clicking a day shows its details. |
 | 🎒 **Classes & grades** | Color-coded classes with meeting times, a weekly schedule, a live weighted grade, and "you need X% on the rest to reach 90%". |
 | ⏱ **Focus mode** | A Pomodoro-style orbit timer tied to a task. Logged time counts against the estimate and checks off study blocks. |
+| 📷 **Screenshots** | Upload (or paste, or drag in, or snap with your phone camera) pictures of your class schedule, syllabus, assignment sheets and notes. Attach them to a class or a specific assignment; your schedule is one tap away on the Launchpad. Images are compressed and **encrypted** like everything else. |
 | ✅ **Steps** | Break big projects into subtasks and watch the progress bar fill. |
 | 📱 **Works on phones** | Responsive layout with a bottom nav. It can be installed to your home screen and works offline. |
 | 🌗 **Light / dark / auto** themes, keyboard shortcuts (`N` add, `1`–`7` views, `L` lock, `?` help), confetti 🎉 |
@@ -43,7 +44,7 @@ The design is based on well-established study and planning practices:
 - **Auto-lock** after inactivity (default 15 min, configurable). The key only lives in memory, so locking or reloading forgets it.
 - **Strict Content-Security-Policy:** no third-party scripts, fonts, trackers, or network calls. All user text is rendered with `textContent` (never `innerHTML`), which blocks script injection.
 
-**Where is my data?** It's stored *encrypted* in this browser's local storage. Nothing is uploaded, which also means nothing syncs automatically. To use another device or keep a safety copy, go to **Settings → Encrypted backup** and restore the file on the other device from the login screen. The backup stays encrypted.
+**Where is my data?** It's stored *encrypted* in this browser (planner data in local storage, screenshots in IndexedDB — same key, AES-256-GCM, fresh IV per file). Nothing is uploaded, which also means nothing syncs automatically. To use another device or keep a safety copy, go to **Settings → Encrypted backup** and restore the file on the other device from the login screen. The backup stays encrypted.
 
 > Because nothing is sent to a server, nobody (including the site owner) can reset your password without your recovery code. Keep it safe!
 
@@ -72,5 +73,7 @@ js/logic.js         priority, auto-planner, workload forecast, grades, streaks, 
 js/parse.js         natural-language quick-add parser
 js/views.js         Launchpad, Horizon, Month, Tasks, Classes, Focus, Settings, editors
 js/ui.js            modals, toasts, confetti
+js/attach.js        screenshot upload, gallery, viewer, Files page
+js/files.js         IndexedDB storage + image compression
 sw.js               offline cache (app files only, never your data)
 ```

@@ -1,21 +1,22 @@
 // Shared UI pieces: modals, toasts, confetti, SVG.
 import { el, add, clear } from './util.js';
 
-let openModal = null;
+// Modals stack, so e.g. a screenshot viewer can open on top of the item editor.
+const stack = [];
 
-export function modal(title, build, { center = false, onClose } = {}) {
-  closeModal();
-  const body = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+export function modal(title, build, { center = false, wide = false, onClose } = {}) {
+  const body = el('div', { class: `modal${wide ? ' wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
   const back = el('div', { class: `modal-back${center ? ' center' : ''}` }, body);
   const close = () => {
-    if (openModal !== ctl) return;
+    const i = stack.indexOf(ctl);
+    if (i === -1) return;
+    stack.splice(i, 1);
     back.remove();
-    openModal = null;
     document.removeEventListener('keydown', onKey, true);
     onClose?.();
   };
   const onKey = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && stack[stack.length - 1] === ctl) {
       e.stopPropagation();
       close();
     }
@@ -23,7 +24,8 @@ export function modal(title, build, { center = false, onClose } = {}) {
   const ctl = { close, body, rebuild: () => render() };
   const render = () => {
     clear(body);
-    add(body, 
+    add(
+      body,
       el('div', { class: 'modal-head' }, el('h3', {}, title), el('button', { class: 'btn icon ghost', 'aria-label': 'Close', onclick: close }, '✕')),
       build(ctl),
     );
@@ -34,16 +36,16 @@ export function modal(title, build, { center = false, onClose } = {}) {
   document.addEventListener('keydown', onKey, true);
   render();
   document.body.appendChild(back);
-  openModal = ctl;
-  setTimeout(() => body.querySelector('input:not([type=checkbox]), select, textarea')?.focus(), 30);
+  stack.push(ctl);
+  setTimeout(() => body.querySelector('input:not([type=checkbox]):not([type=file]), select, textarea')?.focus(), 30);
   return ctl;
 }
 
 export function closeModal() {
-  openModal?.close();
+  while (stack.length) stack[stack.length - 1].close();
 }
 export function modalOpen() {
-  return !!openModal;
+  return stack.length > 0;
 }
 
 export function confirmBox(message, { ok = 'Confirm', danger = false } = {}) {

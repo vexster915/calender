@@ -1,6 +1,6 @@
 // Offline support. Network-first so updates show up right away; cache is the fallback.
 // Only the app's own static files are cached — your planner data lives encrypted in localStorage, never here.
-const CACHE = 'orbit-v1';
+const CACHE = 'orbit-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -12,6 +12,8 @@ const ASSETS = [
   'js/parse.js',
   'js/views.js',
   'js/ui.js',
+  'js/files.js',
+  'js/attach.js',
   'icons/icon.svg',
   'manifest.webmanifest',
 ];

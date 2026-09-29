@@ -12,6 +12,8 @@
 //   * The username is bound into every ciphertext as additional authenticated
 //     data, so blobs can't be swapped between accounts.
 
+import * as files from './files.js';
+
 const ACCOUNTS_KEY = 'orbit.accounts';
 const DATA_PREFIX = 'orbit.data.';
 const THROTTLE_PREFIX = 'orbit.throttle.';
@@ -77,6 +79,16 @@ async function open(key, box, aad) {
   return new Uint8Array(
     await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(box.iv), additionalData: enc.encode(aad) }, key, unb64(box.ct)),
   );
+}
+
+// Binary variant for files in IndexedDB (no base64 overhead).
+async function sealRaw(key, bytes, aad) {
+  const iv = rand(12);
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(aad) }, key, bytes);
+  return { iv, ct: new Uint8Array(ct) };
+}
+async function openRaw(key, box, aad) {
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: box.iv, additionalData: enc.encode(aad) }, key, box.ct));
 }
 
 function importDek(raw) {
@@ -243,22 +255,45 @@ export class Session {
     writeAccounts(accounts);
     return code;
   }
-  exportBackup() {
+  // ----- encrypted files (screenshots) -----
+  fileKey(id) {
+    return `${this.user}/${id}`;
+  }
+  async saveFile(id, bytes) {
+    await files.putBlob(this.fileKey(id), await sealRaw(this.dek, bytes, `file:${this.user}:${id}`));
+  }
+  async loadFile(id) {
+    const box = await files.getBlob(this.fileKey(id));
+    if (!box) return null;
+    return openRaw(this.dek, box, `file:${this.user}:${id}`);
+  }
+  async deleteFile(id) {
+    await files.deleteBlob(this.fileKey(id));
+  }
+  async exportBackup() {
     // The backup stays encrypted — it's useless without the password or recovery code.
+    const prefix = `${this.user}/`;
+    const blobs = {};
+    for (const key of await files.keysWithPrefix(prefix)) {
+      const box = await files.getBlob(key);
+      blobs[key.slice(prefix.length)] = { iv: b64(box.iv), ct: b64(box.ct) };
+    }
     return {
       format: 'orbit-backup',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       account: readAccounts()[this.user],
       data: JSON.parse(localStorage.getItem(DATA_PREFIX + this.user)),
+      files: blobs,
     };
   }
-  deleteAccount() {
+  async deleteAccount() {
     const accounts = readAccounts();
     delete accounts[this.user];
     writeAccounts(accounts);
     localStorage.removeItem(DATA_PREFIX + this.user);
     clearFailures(this.user);
+    await files.deletePrefix(`${this.user}/`).catch(() => {});
     this.dek = null;
   }
   lock() {
@@ -378,9 +413,14 @@ export async function importBackup(backup, password) {
   if (accounts[user] && accounts[user].createdAt !== rec.createdAt) {
     throw new Error('A different account with that username already exists on this device.');
   }
+  const blobs = Object.entries(backup.files || {});
+  // Check every file decrypts with this key before writing anything.
+  for (const [id, box] of blobs) await open(dek, box, `file:${user}:${id}`);
   accounts[user] = rec;
   writeAccounts(accounts);
   localStorage.setItem(DATA_PREFIX + user, JSON.stringify(backup.data));
+  await files.deletePrefix(`${user}/`);
+  for (const [id, box] of blobs) await files.putBlob(`${user}/${id}`, { iv: unb64(box.iv), ct: unb64(box.ct) });
   clearFailures(user);
   return new Session(user, rec.username, dek);
 }

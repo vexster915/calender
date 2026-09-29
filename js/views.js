@@ -10,6 +10,7 @@ import {
 import { TYPES } from './parse.js';
 import { modal, confirmBox, toast, svg, confetti } from './ui.js';
 import * as vault from './vault.js';
+import { gallery, renderFiles, openSchedule } from './attach.js';
 
 // ------------------------------------------------------------------ shared bits
 const NO_CLASS = { id: null, name: 'Personal', code: 'ME', color: '#8a84b3' };
@@ -198,7 +199,15 @@ function renderLaunch(app) {
   const todayCard = el(
     'div',
     { class: 'card' },
-    el('h3', {}, '☀️ Today'),
+    el(
+      'h3',
+      {},
+      '☀️ Today',
+      el('span', { class: 'spacer' }),
+      app.data.attachments.some((a) => a.kind === 'schedule')
+        ? el('button', { class: 'btn sm', style: { textTransform: 'none', letterSpacing: 0 }, onclick: () => openSchedule(app) }, '📷 My schedule')
+        : el('button', { class: 'btn sm ghost', style: { textTransform: 'none', letterSpacing: 0 }, onclick: () => app.go('files', { uploadKind: 'schedule' }) }, '📷 Add schedule screenshot'),
+    ),
     entries.length
       ? el(
           'div',
@@ -609,6 +618,11 @@ function gradeRing(pct, color) {
   );
 }
 
+function shotCount(app, classId) {
+  const n = app.data.attachments.filter((a) => a.classId === classId).length;
+  return n ? el('span', { class: 'muted' }, ` · 📎 ${n}`) : null;
+}
+
 function renderClasses(app) {
   const { data } = app;
   const cards = data.classes.map((c) => {
@@ -636,7 +650,7 @@ function renderClasses(app) {
       el(
         'div',
         { class: 'small', style: { marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--line)' } },
-        el('div', {}, el('b', {}, String(open.length)), ' open', next ? el('span', { class: 'muted' }, ` · next: ${next.title} (${relDay(new Date(next.due))})`) : null),
+        el('div', {}, el('b', {}, String(open.length)), ' open', shotCount(app, c.id), next ? el('span', { class: 'muted' }, ` · next: ${next.title} (${relDay(new Date(next.due))})`) : null),
         need && el('div', { class: 'muted', style: { marginTop: '4px' } }, need.needed <= 0 ? '🎯 You\'ve locked in an A− or better.' : need.needed > 100 ? '🎯 A 90% is out of reach — aim to maximise what\'s left.' : `🎯 Need ${need.needed.toFixed(0)}% avg on the remaining ${need.remainingWeight}% to reach 90%.`),
       ),
     );
@@ -685,6 +699,7 @@ function renderClasses(app) {
 export function openClassEditor(app, cls) {
   const isNew = !cls;
   const draft = cls ? structuredClone(cls) : { id: uid(), name: '', code: '', color: CLASS_COLORS[app.data.classes.length % CLASS_COLORS.length], teacher: '', room: '', meetings: [] };
+  const prevPaste = app.pasteTarget;
   modal(isNew ? 'New class' : 'Edit class', (ctl) => {
     const bind = (key, attrs = {}) => {
       const input = el('input', { type: 'text', value: draft[key] || '', ...attrs });
@@ -764,6 +779,14 @@ export function openClassEditor(app, cls) {
         },
         '+ Add meeting time',
       ),
+      !isNew && el('div', { class: 'section-h' }, 'Screenshots'),
+      !isNew &&
+        gallery(app, {
+          filter: (a) => a.classId === cls.id && !a.itemId,
+          meta: () => ({ kind: 'notes', classId: cls.id }),
+          empty: 'Syllabus, notes, handouts — keep them with the class.',
+          compact: true,
+        }),
       err,
       el(
         'div',
@@ -776,7 +799,9 @@ export function openClassEditor(app, cls) {
               onclick: async () => {
                 const count = app.data.items.filter((i) => i.classId === cls.id).length;
                 if (!(await confirmBox(`Delete ${cls.name}? ${count ? `Its ${count} item(s) will move to Personal.` : ''}`, { ok: 'Delete class', danger: true }))) return;
+                ctl.close();
                 app.data.classes = app.data.classes.filter((c) => c.id !== cls.id);
+                for (const a of app.data.attachments) if (a.classId === cls.id) a.classId = null;
                 for (const i of app.data.items) if (i.classId === cls.id) i.classId = null;
                 app.commit();
               },
@@ -807,7 +832,7 @@ export function openClassEditor(app, cls) {
         ),
       ),
     );
-  });
+  }, { onClose: () => (app.pasteTarget = prevPaste) });
 }
 
 // ------------------------------------------------------------------ Item editor
@@ -838,6 +863,8 @@ export function openItemEditor(app, item, opts = {}) {
   draft.subtasks ||= [];
   draft.plan ||= [];
 
+  let saved = false;
+  const prevPaste = app.pasteTarget;
   modal(isNew ? 'New item' : 'Edit item', (ctl) => {
     const title = el('input', { type: 'text', value: draft.title, placeholder: 'What needs doing?' });
     title.addEventListener('input', () => (draft.title = title.value));
@@ -972,6 +999,13 @@ export function openItemEditor(app, item, opts = {}) {
         ),
       !draft.done && p.level !== 'none' && el('div', { class: 'row small' }, el('span', { class: `chip ${p.level}` }, `${p.label} priority`), el('span', { class: 'muted' }, draft.due ? relDue(draft.due) : '')),
 
+      el('div', { class: 'section-h' }, 'Screenshots'),
+      gallery(app, {
+        filter: (a) => a.itemId === draft.id,
+        meta: () => ({ kind: 'work', itemId: draft.id, classId: draft.classId }),
+        empty: 'Attach the assignment sheet, instructions, or a photo of your work.',
+        compact: true,
+      }),
       draft.type !== 'event' && el('div', { class: 'section-h' }, `Steps${draft.subtasks.length ? ` · ${draft.subtasks.filter((s) => s.done).length}/${draft.subtasks.length}` : ''}`),
       draft.type !== 'event' && subtasks,
 
@@ -1027,12 +1061,17 @@ export function openItemEditor(app, item, opts = {}) {
               onclick: () => {
                 const idx = app.data.items.indexOf(item);
                 app.data.items.splice(idx, 1);
+                // Keep its screenshots (they move to the class in Files).
+                const linked = app.data.attachments.filter((a) => a.itemId === item.id);
+                linked.forEach((a) => (a.itemId = null));
+                saved = true;
                 ctl.close();
                 app.commit();
                 toast(`Deleted "${item.title}"`, {
                   action: 'Undo',
                   onAction: () => {
                     app.data.items.splice(idx, 0, item);
+                    linked.forEach((a) => (a.itemId = item.id));
                     app.commit();
                   },
                 });
@@ -1055,6 +1094,7 @@ export function openItemEditor(app, item, opts = {}) {
                 copy.score = null;
                 copy.subtasks.forEach((s) => (s.done = false));
                 app.data.items.push(copy);
+                saved = true;
                 ctl.close();
                 app.commit();
                 toast('Duplicated');
@@ -1086,6 +1126,8 @@ export function openItemEditor(app, item, opts = {}) {
                 Object.assign(item, draft);
                 if (dueChanged && item.plan.some((s) => !s.done)) item.plan = autoPlan(item, app.data);
               }
+              for (const a of app.data.attachments) if (a.itemId === draft.id) a.classId = draft.classId;
+              saved = true;
               ctl.close();
               app.commit();
             },
@@ -1094,6 +1136,15 @@ export function openItemEditor(app, item, opts = {}) {
         ),
       ),
     );
+  }, {
+    onClose: () => {
+      app.pasteTarget = prevPaste;
+      if (saved) return;
+      // Screenshots are saved immediately; keep them linked to the item's class.
+      for (const a of app.data.attachments) if (a.itemId === draft.id) a.classId = draft.classId;
+      if (isNew) for (const a of app.data.attachments) if (a.itemId === draft.id) a.itemId = null;
+      app.commit({ render: !isNew });
+    },
   });
 }
 
@@ -1450,7 +1501,7 @@ function renderSettings(app) {
               class: 'btn primary',
               onclick: async () => {
                 await app.save();
-                download(`orbit-backup-${app.session.username}-${dayKey(new Date())}.json`, JSON.stringify(app.session.exportBackup(), null, 1), 'application/json');
+                download(`orbit-backup-${app.session.username}-${dayKey(new Date())}.json`, JSON.stringify(await app.session.exportBackup()), 'application/json');
                 toast('Encrypted backup downloaded');
               },
             },
@@ -1490,12 +1541,17 @@ function renderSettings(app) {
             {
               class: 'btn danger',
               onclick: async () => {
-                if (!(await confirmBox('Remove all classes, items and focus history? Your account stays.', { ok: 'Clear everything', danger: true }))) return;
+                if (!(await confirmBox('Remove all classes, items, screenshots and focus history? Your account stays.', { ok: 'Clear everything', danger: true }))) return;
                 const settings = app.data.settings;
                 app.data.classes = [];
                 app.data.items = [];
                 app.data.focusLog = [];
                 app.data.activity = [];
+                for (const a of app.data.attachments) {
+                  await app.session.deleteFile(a.id).catch(() => {});
+                  await app.session.deleteFile(`${a.id}.t`).catch(() => {});
+                }
+                app.data.attachments = [];
                 app.data.settings = settings;
                 app.commit();
               },
@@ -1554,8 +1610,9 @@ function deleteAccount(app) {
       const confirmInput = el('input', { type: 'text', placeholder: app.session.username, autocomplete: 'off' });
       const btn = el('button', { class: 'btn danger', disabled: true }, 'Delete forever');
       confirmInput.addEventListener('input', () => (btn.disabled = confirmInput.value !== app.session.username));
-      btn.addEventListener('click', () => {
-        app.session.deleteAccount();
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await app.session.deleteAccount();
         app.session = null;
         ctl.close();
         location.reload();
@@ -1606,8 +1663,9 @@ export const VIEWS = {
   month: { label: 'Month', icon: '🗓', render: renderMonth, mobile: true },
   tasks: { label: 'Tasks', icon: '✓', render: renderTasks, mobile: true },
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: true },
+  files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: true },
   focus: { label: 'Focus', icon: '⏱', render: renderFocus, mobile: true },
   settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
 };
-export const NAV_ORDER = ['launch', 'horizon', 'month', 'tasks', 'classes', 'focus', 'settings'];
+export const NAV_ORDER = ['launch', 'horizon', 'month', 'tasks', 'classes', 'files', 'focus', 'settings'];
 
