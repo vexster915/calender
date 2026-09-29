@@ -1,30 +1,34 @@
-# 🪐 Orbit: an encrypted school planner
+# 🪐 Orbit: study smarter, with your planner in the background
 
-Orbit is a planner built for school. It's not a calendar clone. Instead of giving you an empty grid to fill in, it looks at everything you owe, ranks it, and **plans your study time for you**.
+Orbit turns your classwork into things you can study. Upload a PDF of your notes, a study guide, or a worksheet and Orbit builds a **study set**: flashcards, an adaptive Learn mode, practice tests, a match game, and key points. It then brings each card back for review right before you'd forget it. Your class calendar still works, but it runs quietly in the background and feeds your test dates into what you study.
 
-It runs entirely in your browser and is hosted free on GitHub Pages. Everything you enter is **encrypted behind your own username and password**.
+Everything runs in your browser and is hosted free on GitHub Pages. All your data is **encrypted behind your username and password**.
 
-## Features
+## Study features
 
 | | |
 |---|---|
-| 🚀 **Launchpad** | Your daily home screen: the top 3 "mission" items, today's timeline (classes, deadlines, study blocks), a day streak, and weekly stats. |
-| 📈 **Workload forecast** | A 14-day bar chart of how much work each day holds, colored against your personal daily capacity. You can spot an overloaded Thursday a week ahead. |
-| ✨ **Auto-planner** | Give an assignment an effort estimate and Orbit splits it into study sessions on your lightest days. **Exams and quizzes use spaced repetition** (sessions 1, 2, 4, 7… days before) instead of cramming. |
-| 🎯 **Smart priority** | Every item gets a Critical / High / Steady / Chill rating from *work left ÷ time left × grade weight*, not just its due date. |
-| ⌨️ **Natural-language quick add** | Type `Calc midterm oct 14 9am #math ~5h 25%` and press Enter. Class, type, date, time, effort and weight are all detected. |
-| 🌅 **Horizon view** | Three weeks laid out as one lane per class, showing deadlines and planned study blocks together. |
-| 🗓 **Month heat map** | Each day is tinted by workload, and clicking a day shows its details. |
-| 🎒 **Classes & grades** | Color-coded classes with meeting times, a weekly schedule, a live weighted grade, and "you need X% on the rest to reach 90%". |
-| ⏱ **Focus mode** | A Pomodoro-style orbit timer tied to a task. Logged time counts against the estimate and checks off study blocks. |
-| 📷 **Screenshots** | Upload (or paste, or drag in, or snap with your phone camera) pictures of your class schedule, syllabus, assignment sheets and notes. Attach them to a class or a specific assignment; your schedule is one tap away on the Launchpad. Images are compressed and **encrypted** like everything else. |
-| ✅ **Steps** | Break big projects into subtasks and watch the progress bar fill. |
-| 📱 **Works on phones** | Responsive layout with a bottom nav. It can be installed to your home screen and works offline. |
-| 🌗 **Light / dark / auto** themes, keyboard shortcuts (`N` add, `1`–`7` views, `L` lock, `?` help), confetti 🎉 |
+| 📄 **PDF → study set** | Drop in a PDF (or several) and Orbit reads it, finds vocabulary (`Term: definition`, `Term – definition`), definition sentences ("Osmosis is…"), Q&A pairs, and important facts for fill-in-the-blank cards. You review and edit the cards before saving. It also works with pasted notes and **imports Quizlet exports** (tab-separated). |
+| 🃏 **Flashcards** | Flip cards and sort them into *know it* / *still learning*, then re-study only the misses. Shuffle, swap sides, star cards. |
+| 🪐 **Learn** | Adaptive rounds. Each card must be answered correctly by **multiple choice**, then by **typing** it. Misses come back a few questions later. Typing is forgiving of small typos, and there's an "I was right" override. |
+| 📝 **Test** | Build a practice test from multiple-choice, true/false, and written questions, then get a score and see every mistake. |
+| ⚡ **Match** | Race the clock pairing terms with definitions. Wrong pairs cost a second, and your best time is saved. |
+| 🧠 **Review (spaced repetition)** | A daily queue across all your sets. Rate each card Again / Hard / Good / Easy and Orbit schedules the next review (10 min → 1 day → 3 → a week → a month…). |
+| 🌌 **Orbits** | Every card moves New → Launching → Outer orbit → Inner orbit → **Mastered**, so you can see exactly how ready you are, per set and per test. |
+| 🎯 **Exam boost** *(the planner in the background)* | When a class has an exam or quiz within a week, that class's unmastered cards are pulled into your daily review early. Home shows each upcoming test with a "% ready" bar and a Study button. |
+| ✨ **Key points** | The most information-dense sentences from your material, plus the main topics, for quick skimming. |
+
+## Planner (background)
+
+The original planner lives under **Planner**: an overview with a workload forecast, a 3-week Horizon view, a month heat map, and tasks, plus natural-language quick add (`Calc midterm oct 14 9am #math !exam`), classes with grades, screenshots of schedules and work, and a focus timer.
 
 ## Why it works this way (research notes)
 
 The design is based on well-established study and planning practices:
+
+- **Retrieval practice ("the testing effect").** Actively recalling an answer (quizzing, typing it out) builds much stronger memory than rereading notes. That's why Learn moves from recognising the answer (multiple choice) to recalling it (typing).
+- **Spaced repetition.** Reviewing just before you'd forget, at growing intervals, is one of the most reliably proven ways to remember things long-term. Orbit uses a variant of the SM-2 algorithm (the one behind Anki and SuperMemo).
+- **Interleaving and immediate feedback.** Mixing cards and showing the right answer straight away helps you avoid memorising wrong answers.
 
 - **Spaced repetition beats cramming.** Spreading exam review over several days leads to much better long-term retention than the same total time in one session (the "spacing effect"). Orbit schedules exam sessions on expanding intervals.
 - **Backward planning / chunking.** Breaking a big deadline into small dated sessions reduces procrastination and "planning fallacy" overruns. The auto-planner does this chunking for you and front-loads work.
@@ -44,7 +48,7 @@ The design is based on well-established study and planning practices:
 - **Auto-lock** after inactivity (default 15 min, configurable). The key only lives in memory, so locking or reloading forgets it.
 - **Strict Content-Security-Policy:** no third-party scripts, fonts, trackers, or network calls. All user text is rendered with `textContent` (never `innerHTML`), which blocks script injection.
 
-**Where is my data?** It's stored *encrypted* in this browser (planner data in local storage, screenshots in IndexedDB — same key, AES-256-GCM, fresh IV per file). Nothing is uploaded, which also means nothing syncs automatically. To use another device or keep a safety copy, go to **Settings → Encrypted backup** and restore the file on the other device from the login screen. The backup stays encrypted.
+**Where is my data?** It's stored *encrypted* in this browser. Study sets and planner data are in local storage. PDFs, their extracted text, and screenshots are in IndexedDB. Everything uses the same key: AES-256-GCM with a fresh IV per file. PDFs are read on your device and never uploaded anywhere. Nothing is uploaded, which also means nothing syncs automatically. To use another device or keep a safety copy, go to **Settings → Encrypted backup** and restore the file on the other device from the login screen. The backup stays encrypted.
 
 > Because nothing is sent to a server, nobody (including the site owner) can reset your password without your recovery code. Keep it safe!
 
@@ -72,6 +76,11 @@ js/vault.js         accounts + encryption (PBKDF2, AES-GCM, recovery codes)
 js/logic.js         priority, auto-planner, workload forecast, grades, streaks, .ics export
 js/parse.js         natural-language quick-add parser
 js/views.js         Launchpad, Horizon, Month, Tasks, Classes, Focus, Settings, editors
+js/study.js         Home, Library, study sets, Flashcards / Learn / Test / Match / Review
+js/srs.js           spaced-repetition scheduling, orbits, review queue, exam boost
+js/gen.js           card generator (glossary, definitions, Q&A, fill-in-the-blank, key points)
+js/pdf.js           PDF text extraction (uses the bundled pdf.js)
+vendor/pdfjs/       Mozilla pdf.js (Apache-2.0), bundled so no outside servers are contacted
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
 js/files.js         IndexedDB storage + image compression

@@ -11,6 +11,8 @@ import { TYPES } from './parse.js';
 import { modal, confirmBox, toast, svg, confetti } from './ui.js';
 import * as vault from './vault.js';
 import { gallery, renderFiles, openSchedule } from './attach.js';
+import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, deleteSet } from './study.js';
+import { dueCount } from './srs.js';
 
 // ------------------------------------------------------------------ shared bits
 const NO_CLASS = { id: null, name: 'Personal', code: 'ME', color: '#8a84b3' };
@@ -90,8 +92,6 @@ function pageTitle(title, ...extra) {
 function renderLaunch(app) {
   const { data } = app;
   const now = new Date();
-  const hour = now.getHours();
-  const greet = hour < 5 ? 'Up late' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const open = data.items.filter((i) => !i.done);
   const weekEnd = addDays(startOfDay(now), 7);
   const dueWeek = open.filter((i) => i.due && new Date(i.due) < weekEnd && new Date(i.due) >= now).length;
@@ -105,7 +105,7 @@ function renderLaunch(app) {
   const hero = el(
     'div',
     { class: 'hero' },
-    el('div', {}, el('div', { class: 'muted' }, fmtDate(now, { year: true })), el('h2', {}, `${greet}, `, el('span', { class: 'grad-text' }, app.session.username))),
+    el('div', {}, el('div', { class: 'muted' }, fmtDate(now, { year: true })), el('h2', {}, 'Your week ', el('span', { class: 'grad-text' }, 'at a glance'))),
     el(
       'div',
       { class: 'stats' },
@@ -835,6 +835,19 @@ export function openClassEditor(app, cls) {
   }, { onClose: () => (app.pasteTarget = prevPaste) });
 }
 
+// Exams and quizzes show the study sets for their class, so prep is one click away.
+function studyLinks(app, draft, ctl) {
+  const sets = app.data.sets.filter((s) => draft.classId && s.classId === draft.classId);
+  return el(
+    'div',
+    { class: 'study-links' },
+    el('span', { class: 'small muted' }, '🧠 Study for this:'),
+    sets.length
+      ? sets.map((s) => el('button', { class: 'btn sm', onclick: () => (ctl.close(), app.go('set', { id: s.id })) }, s.title))
+      : el('button', { class: 'btn sm', onclick: () => (ctl.close(), app.go('library')) }, '+ Make a study set'),
+  );
+}
+
 // ------------------------------------------------------------------ Item editor
 export function openItemEditor(app, item, opts = {}) {
   const isNew = !!opts.isNew;
@@ -997,6 +1010,7 @@ export function openItemEditor(app, item, opts = {}) {
           el('label', { class: 'field' }, el('span', {}, 'Estimated effort (minutes)'), est),
           el('label', { class: 'field' }, el('span', {}, 'Grade weight %'), weight),
         ),
+      ['exam', 'quiz'].includes(draft.type) && studyLinks(app, draft, ctl),
       !draft.done && p.level !== 'none' && el('div', { class: 'row small' }, el('span', { class: `chip ${p.level}` }, `${p.label} priority`), el('span', { class: 'muted' }, draft.due ? relDue(draft.due) : '')),
 
       el('div', { class: 'section-h' }, 'Screenshots'),
@@ -1195,7 +1209,7 @@ function startTicker(app) {
     if (!app.session || !f.running) {
       clearInterval(ticker);
       ticker = null;
-      document.title = 'Orbit · School Planner';
+      document.title = 'Orbit · Study';
       return;
     }
     const ms = remaining(f);
@@ -1475,6 +1489,11 @@ function renderSettings(app) {
         ),
       ),
       card(
+        '🧠 Studying',
+        el('div', { class: 'grid-2' }, num('dailyGoal', 'Daily goal (cards)', 5, 500, 5), num('newPerDay', 'New cards per day in Review', 0, 200, 5)),
+        el('p', { class: 'small muted', style: { margin: 0 } }, 'New cards are introduced gradually so reviews never pile up. Exams in the Planner automatically pull their class’s cards forward.'),
+      ),
+      card(
         '🧭 Planning',
         el('div', { class: 'grid-2' }, num('sessionMin', 'Study session length (min)', 15, 180), num('dailyCapMin', 'Daily capacity (min)', 30, 720, 15)),
         el('div', { class: 'grid-3' }, num('focusMin', 'Focus (min)', 5, 120, 5), num('shortBreakMin', 'Short break', 1, 30, 1), num('longBreakMin', 'Long break', 5, 60, 5)),
@@ -1541,7 +1560,7 @@ function renderSettings(app) {
             {
               class: 'btn danger',
               onclick: async () => {
-                if (!(await confirmBox('Remove all classes, items, screenshots and focus history? Your account stays.', { ok: 'Clear everything', danger: true }))) return;
+                if (!(await confirmBox('Remove all study sets, classes, items, screenshots and history? Your account stays.', { ok: 'Clear everything', danger: true }))) return;
                 const settings = app.data.settings;
                 app.data.classes = [];
                 app.data.items = [];
@@ -1552,6 +1571,9 @@ function renderSettings(app) {
                   await app.session.deleteFile(`${a.id}.t`).catch(() => {});
                 }
                 app.data.attachments = [];
+                for (const set of [...app.data.sets]) await deleteSet(app, set);
+                app.data.docs = [];
+                app.data.studyLog = {};
                 app.data.settings = settings;
                 app.commit();
               },
@@ -1657,15 +1679,34 @@ export function openHelp() {
 }
 
 // ------------------------------------------------------------------ registry
-export const VIEWS = {
-  launch: { label: 'Launchpad', short: 'Home', icon: '🚀', render: renderLaunch, mobile: true },
-  horizon: { label: 'Horizon', icon: '🌅', render: renderHorizon, mobile: false },
-  month: { label: 'Month', icon: '🗓', render: renderMonth, mobile: true },
-  tasks: { label: 'Tasks', icon: '✓', render: renderTasks, mobile: true },
-  classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: true },
-  files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: true },
-  focus: { label: 'Focus', icon: '⏱', render: renderFocus, mobile: true },
-  settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
-};
-export const NAV_ORDER = ['launch', 'horizon', 'month', 'tasks', 'classes', 'files', 'focus', 'settings'];
+// ------------------------------------------------------------------ Planner (calendar, in the background)
+export const PLANNER_TABS = ['launch', 'horizon', 'month', 'tasks'];
+function renderPlanner(app) {
+  const tab = PLANNER_TABS.includes(app.plannerTab) ? app.plannerTab : 'launch';
+  const labels = { launch: '🚀 Overview', horizon: '🌅 Horizon', month: '🗓 Month', tasks: '✓ Tasks' };
+  return el(
+    'div',
+    {},
+    el('div', { class: 'planner-tabs' }, el('div', { class: 'seg' }, PLANNER_TABS.map((t) => el('button', { class: t === tab ? 'on' : '', onclick: () => app.go(t) }, labels[t])))),
+    { launch: renderLaunch, horizon: renderHorizon, month: renderMonth, tasks: renderTasks }[tab](app),
+  );
+}
 
+export const VIEWS = {
+  home: { label: 'Home', icon: '🏠', render: renderHome, mobile: true },
+  library: { label: 'Library', icon: '📚', render: renderLibrary, mobile: true },
+  review: { label: 'Review', icon: '🧠', render: renderReviewHub, mobile: true, badge: (app) => dueCount(app.data) },
+  planner: { label: 'Planner', icon: '🗓', render: renderPlanner, mobile: true },
+  classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
+  files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },
+  focus: { label: 'Focus timer', icon: '⏱', render: renderFocus, mobile: false },
+  settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
+  set: { label: 'Study set', icon: '📚', render: renderSet },
+  study: { label: 'Study', icon: '🪐', render: renderStudy },
+};
+export const NAV_GROUPS = [
+  ['Study', ['home', 'library', 'review']],
+  ['Plan', ['planner', 'classes', 'files']],
+  ['Tools', ['focus', 'settings']],
+];
+export const NAV_ORDER = NAV_GROUPS.flatMap(([, ids]) => ids);

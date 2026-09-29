@@ -1,5 +1,31 @@
 // Planning brains: priority scoring, auto-planning study sessions, workload, grades, streaks.
 import { addDays, dayKey, daysBetween, startOfDay, uid } from './util.js';
+import { generateCards } from './gen.js';
+import { newCard } from './srs.js';
+
+const SAMPLE_NOTES = `UNIT 4: CELLULAR RESPIRATION
+
+Cellular respiration is the process by which cells break down glucose to release energy in the form of ATP. It occurs in three main stages and takes place in both plant and animal cells.
+
+Key Vocabulary
+ATP: adenosine triphosphate, the main energy currency of the cell
+Glycolysis – the first stage of respiration, which splits glucose into two molecules of pyruvate in the cytoplasm
+Mitochondria: organelles where the Krebs cycle and electron transport chain take place
+Fermentation - an anaerobic process that regenerates NAD+ so glycolysis can continue without oxygen
+Aerobic: requiring oxygen
+Anaerobic: not requiring oxygen
+Pyruvate: the three-carbon molecule produced when glucose is split during glycolysis
+
+The Three Stages
+Glycolysis happens in the cytoplasm and produces a net gain of 2 ATP molecules. The Krebs cycle takes place in the matrix of the mitochondria and releases carbon dioxide as a waste product. The electron transport chain is the final stage and produces about 34 ATP molecules by using oxygen as the final electron acceptor.
+
+The Krebs cycle was discovered by Hans Krebs in 1937, who later won the Nobel Prize for this work. Without oxygen, cells rely on fermentation, which produces lactic acid in muscle cells and ethanol in yeast. Lactic acid buildup contributes to muscle fatigue during intense exercise.
+
+Q: Where does glycolysis take place?
+A: In the cytoplasm
+Q: What is the final electron acceptor in the electron transport chain?
+A: Oxygen`;
+
 
 export const TYPE_META = {
   assignment: { label: 'Assignment', icon: '✎', importance: 1.5, defaultMin: 60 },
@@ -25,12 +51,17 @@ export function emptyData() {
       focusMin: 25,
       shortBreakMin: 5,
       longBreakMin: 15,
+      dailyGoal: 30,
+      newPerDay: 15,
     },
     classes: [],
     items: [],
     focusLog: [],
     activity: [],
     attachments: [],
+    sets: [],
+    docs: [],
+    studyLog: {},
   };
 }
 
@@ -309,10 +340,42 @@ export function sampleData(data, now = new Date()) {
     mk({ title: 'Mitosis worksheet', type: 'assignment', classId: bio, due: at(-4, 23, 59), estimateMin: 45, weight: 5, done: true, doneAt: at(-5, 20), score: 18, maxScore: 20 }),
     mk({ title: 'Map project', type: 'project', classId: hist, due: at(-3, 13, 0), estimateMin: 180, weight: 10, done: true, doneAt: at(-3, 9), score: 88, maxScore: 100 }),
   ];
+  items.push(mk({ title: 'Unit 4 quiz: cellular respiration', type: 'quiz', classId: bio, due: at(5, 9, 0), estimateMin: 60, weight: 8 }));
   data.classes.push(...cls);
   data.items.push(...items);
   for (const it of data.items) if (!it.done && it.type !== 'event') it.plan = autoPlan(it, data, now);
   for (let i = 1; i <= 4; i++) logActivity(data, addDays(t, -i));
+
+  // Study sets
+  const g = generateCards(SAMPLE_NOTES);
+  const mkSet = (title, classId, cards, extra = {}) => ({ id: uid(), title, classId, description: '', createdAt: addDays(now, -5).toISOString(), lastStudied: null, cards, docIds: [], keyPoints: [], topics: [], bestMatchMs: null, tests: [], ...extra });
+  const bioCards = g.cards.map((c) => newCard(c.term, c.def, c.kind));
+  bioCards.slice(0, 5).forEach((c, i) => Object.assign(c, { seen: 2, right: 2, lvl: 1 + (i % 3), ivl: 1 + i, due: addDays(t, i % 2 ? 0 : 2).toISOString() }));
+  const calc = [
+    ['Power rule', 'd/dx xⁿ = n·xⁿ⁻¹'],
+    ['Product rule', "(fg)' = f'g + fg'"],
+    ['Quotient rule', "(f/g)' = (f'g − fg') / g²"],
+    ['Chain rule', "d/dx f(g(x)) = f'(g(x))·g'(x)"],
+    ['Derivative of sin x', 'cos x'],
+    ['Derivative of cos x', '−sin x'],
+    ['Derivative of eˣ', 'eˣ'],
+    ['Derivative of ln x', '1/x'],
+  ].map(([a, b]) => newCard(a, b));
+  calc.forEach((c, i) => Object.assign(c, { seen: 3, right: 3, lvl: Math.min(4, 1 + i), ivl: 2 + i, due: addDays(t, i < 3 ? 0 : i).toISOString() }));
+  const lit = [
+    ['Nick Carraway', 'Narrator of The Great Gatsby; Daisy’s cousin from Minnesota'],
+    ['Green light', 'Symbol of Gatsby’s hopes and dreams for the future with Daisy'],
+    ['Valley of Ashes', 'Desolate area between West Egg and New York, symbolising moral decay'],
+    ['Eyes of Doctor T. J. Eckleburg', 'Billboard often read as God watching over a morally empty society'],
+    ['West Egg', 'Where “new money” lives, including Gatsby and Nick'],
+    ['East Egg', 'Home of “old money”, where Tom and Daisy live'],
+  ].map(([a, b]) => newCard(a, b));
+  data.sets.push(
+    mkSet('Unit 4 — Cellular respiration', bio, bioCards, { keyPoints: g.keyPoints, topics: g.topics }),
+    mkSet('Derivative rules', cls[1].id, calc, { lastStudied: addDays(now, -1).toISOString(), bestMatchMs: 14200 }),
+    mkSet("The Great Gatsby — symbols & characters", cls[3].id, lit),
+  );
+  for (let i = 1; i <= 4; i++) data.studyLog[dayKey(addDays(t, -i))] = { cards: 12 + i * 7, correct: 10 + i * 5, fresh: 5, minutes: 10 + i * 3 };
   return data;
 }
 

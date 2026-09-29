@@ -1,7 +1,7 @@
 {
-  "name": "Orbit — School Planner",
+  "name": "Orbit — Study",
   "short_name": "Orbit",
-  "description": "An encrypted, offline-first planner for school.",
+  "description": "Turn classwork into flashcards, quizzes and spaced review. Encrypted and private.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

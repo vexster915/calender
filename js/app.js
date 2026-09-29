@@ -5,7 +5,8 @@ import { emptyData, autoPlan, TYPE_META, logActivity } from './logic.js';
 import { parseQuickAdd } from './parse.js';
 import { closeModal, modalOpen, toast, logo, confetti } from './ui.js';
 import { forgetImages, uploadFiles } from './attach.js';
-import { VIEWS, NAV_ORDER, openItemEditor, openHelp } from './views.js';
+import { VIEWS, NAV_ORDER, NAV_GROUPS, PLANNER_TABS, openItemEditor, openHelp } from './views.js';
+import { studyKey } from './study.js';
 
 const root = document.getElementById('root');
 
@@ -56,8 +57,13 @@ const app = {
   },
 
   go(view, state) {
-    this.view = view;
     if (state) this.viewState[view] = { ...(this.viewState[view] || {}), ...state };
+    // The calendar screens live together under "Planner".
+    if (PLANNER_TABS.includes(view)) {
+      this.plannerTab = view;
+      view = 'planner';
+    }
+    this.view = view;
     this.render();
     window.scrollTo(0, 0);
   },
@@ -388,10 +394,12 @@ async function enter(session) {
   if (!data) data = emptyData();
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
-  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments']) data[key] ||= [];
+  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs']) data[key] ||= [];
+  data.studyLog ||= {};
   app.session = session;
   app.data = data;
-  app.view = 'launch';
+  app.view = 'home';
+  app.plannerTab = 'launch';
   app.lastActivity = Date.now();
   applyTheme(data.settings.theme);
   app.render();
@@ -411,14 +419,16 @@ function renderShell() {
   const keepQuick = activeEl?.id === 'quick-input' ? { value: activeEl.value, pos: activeEl.selectionStart } : null;
   clear(root);
 
-  const navBtn = (id, i) => {
+  const isOn = (id) => app.view === id || (id === 'library' && ['set', 'study'].includes(app.view));
+  const navBtn = (id) => {
     const v = VIEWS[id];
+    const badge = v.badge?.(app);
     return el(
       'button',
-      { class: `nav-btn${app.view === id ? ' on' : ''}`, onclick: () => app.go(id), 'aria-current': app.view === id ? 'page' : null },
+      { class: `nav-btn${isOn(id) ? ' on' : ''}`, onclick: () => app.go(id), 'aria-current': isOn(id) ? 'page' : null },
       el('span', { class: 'ico' }, v.icon),
       el('span', {}, v.label),
-      el('span', { class: 'kbd' }, String(i + 1)),
+      badge ? el('span', { class: 'nav-badge' }, String(badge)) : el('span', { class: 'kbd' }, String(NAV_ORDER.indexOf(id) + 1)),
     );
   };
 
@@ -428,7 +438,7 @@ function renderShell() {
     'aside',
     { class: 'sidebar' },
     el('div', { class: 'brand' }, logo(), el('h1', { class: 'grad-text' }, 'Orbit')),
-    NAV_ORDER.map(navBtn),
+    NAV_GROUPS.map(([label, ids]) => [el('div', { class: 'nav-group' }, label), ids.map(navBtn)]),
     el(
       'div',
       { class: 'foot' },
@@ -440,13 +450,15 @@ function renderShell() {
   );
 
   if (!modalOpen()) app.pasteTarget = null;
-  const main = el('main', { class: 'main' }, quickAddBar(keepQuick), VIEWS[app.view].render(app));
+  // The calendar quick-add bar only shows on planner screens; study screens stay uncluttered.
+  const showQuick = ['planner', 'classes'].includes(app.view);
+  const main = el('main', { class: `main${app.view === 'study' ? ' focus-mode' : ''}` }, showQuick && quickAddBar(keepQuick), VIEWS[app.view].render(app));
 
   const mobileNav = el(
     'nav',
     { class: 'mobile-nav' },
     NAV_ORDER.filter((id) => VIEWS[id].mobile).map((id) =>
-      el('button', { class: app.view === id ? 'on' : '', onclick: () => app.go(id) }, el('span', { class: 'ico' }, VIEWS[id].icon), VIEWS[id].short || VIEWS[id].label),
+      el('button', { class: isOn(id) ? 'on' : '', onclick: () => app.go(id) }, el('span', { class: 'ico' }, VIEWS[id].icon), VIEWS[id].short || VIEWS[id].label),
     ),
   );
 
@@ -558,6 +570,10 @@ document.addEventListener('keydown', (e) => {
   if (!app.session || modalOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (app.view === 'study') {
+    studyKey(app, e);
+    return;
+  }
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= NAV_ORDER.length) {
     app.go(NAV_ORDER[n - 1]);
