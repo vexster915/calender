@@ -18,6 +18,19 @@ Everything runs in your browser and is hosted free on GitHub Pages. All your dat
 | 🎯 **Exam boost** *(the planner in the background)* | When a class has an exam or quiz within a week, that class's unmastered cards are pulled into your daily review early. Home shows each upcoming test with a "% ready" bar and a Study button. |
 | ✨ **Key points** | The most information-dense sentences from your material, plus the main topics, for quick skimming. |
 
+## AP courses
+
+Pick your AP classes from the built-in catalog of **23 AP courses**. Each comes set up from its official College Board Course and Exam Description (CED): every unit with its exam weighting, the exam's sections, question counts, and timing, plus study tips.
+
+- **Import the CED.** Upload the free CED PDF and Orbit reads each unit's topics, learning objectives, and essential knowledge, then turns them into cards for the right unit.
+- **AP Classroom material.** AP Classroom has no public API and sits behind your College Board sign-in, so Orbit can't (and shouldn't) log in for you. Instead, print any progress check or resource to PDF (Ctrl/⌘+P → Save as PDF) or copy its text, and add it. Orbit detects the unit and pulls out **multiple-choice questions with their answer keys** into a question bank. It makes flashcards from notes too.
+- **Unit tests.** Timed at the real exam's per-question pace, using your question bank first and then questions generated from your cards.
+- **Practice AP exams.** Full-length, half-length, or multiple-choice only, with the real exam's sections and timing. MCQs are spread across units by their official weighting. There's a Bluebook-style question navigator and mark-for-review, and sections auto-submit when time runs out. You self-score FRQs against the rubric. Results show an **estimated 1–5 score** and a per-unit breakdown pointing to your weakest units.
+- **FRQ bank.** Paste released free-response questions (free on each course's "Past FRQs" page) with their scoring guidelines. If there are none, CED learning objectives are used as prompts.
+- **AP exam date.** Add it to the Planner, and the exam boost kicks in for that course's cards in the final week.
+
+**Regular classes:** your own PDFs come first. If you have none, the AP & Courses page suggests free, openly-licensed material for each class, such as an OpenStax textbook (downloadable PDF) and Khan Academy, which you can upload to make a study set.
+
 ## Planner (background)
 
 The original planner lives under **Planner**: an overview with a workload forecast, a 3-week Horizon view, a month heat map, and tasks, plus natural-language quick add (`Calc midterm oct 14 9am #math !exam`), classes with grades, screenshots of schedules and work, and a focus timer.
@@ -80,6 +93,9 @@ js/study.js         Home, Library, study sets, Flashcards / Learn / Test / Match
 js/srs.js           spaced-repetition scheduling, orbits, review queue, exam boost
 js/gen.js           card generator (glossary, definitions, Q&A, fill-in-the-blank, key points)
 js/pdf.js           PDF text extraction (uses the bundled pdf.js)
+js/ap.js            AP courses: units, CED import, AP Classroom material, unit tests, practice exams
+js/apcatalog.js     AP course catalog (units, exam weightings, exam formats) + free resources for regular classes
+js/apparse.js       CED parser, multiple-choice/answer-key parser, FRQ splitter, unit detection
 vendor/pdfjs/       Mozilla pdf.js (Apache-2.0), bundled so no outside servers are contacted
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page

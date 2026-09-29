@@ -61,6 +61,7 @@ export function emptyData() {
     attachments: [],
     sets: [],
     docs: [],
+    courses: [],
     studyLog: {},
   };
 }

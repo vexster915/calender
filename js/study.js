@@ -5,6 +5,7 @@ import { modal, confirmBox, toast, confetti, svg } from './ui.js';
 import { generateCards, parseImport, checkAnswer } from './gen.js';
 import { ORBITS, newCard, grade, previewInterval, isNew, mastery, examsSoon, setsForItem, reviewQueue, dueCount, logStudy, studiedToday, shuffle } from './srs.js';
 import { streak, logActivity, meetingsOn, TYPE_META } from './logic.js';
+import { renderExam, questionBank, courseForSet } from './ap.js';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -14,7 +15,7 @@ export const setById = (app, id) => app.data.sets.find((s) => s.id === id);
 const NO_CLASS = { name: 'General', code: 'GEN', color: '#8a84b3' };
 const classOf = (app, set) => app.classById(set.classId) || NO_CLASS;
 
-function orbitBar(set, { tall = false } = {}) {
+export function orbitBar(set, { tall = false } = {}) {
   const m = mastery(set);
   return el(
     'div',
@@ -23,7 +24,7 @@ function orbitBar(set, { tall = false } = {}) {
   );
 }
 
-function ring(pct, color = 'url(#rg)', size = 64, label = `${pct}%`) {
+export function ring(pct, color = 'url(#rg)', size = 64, label = `${pct}%`) {
   const r = 26;
   const c = 2 * Math.PI * r;
   return svg(
@@ -36,7 +37,7 @@ function ring(pct, color = 'url(#rg)', size = 64, label = `${pct}%`) {
   );
 }
 
-function pageTitle(title, ...extra) {
+export function pageTitle(title, ...extra) {
   return el('div', { class: 'page-title' }, el('h2', {}, title), el('span', { class: 'spacer' }), ...extra);
 }
 
@@ -47,7 +48,7 @@ function prompt(card, dir) {
   return dir === 'term' ? { q: card.term, a: card.def, qLabel: 'Term', aLabel: 'Definition' } : { q: card.def, a: card.term, qLabel: 'Definition', aLabel: 'Term' };
 }
 
-function startStudy(app, setId, mode, extra = {}) {
+export function startStudy(app, setId, mode, extra = {}) {
   app.viewState.study = { session: createSession(app, setId, mode, extra) };
   app.go('study');
 }
@@ -233,7 +234,7 @@ function setTile(app, set) {
   );
 }
 
-function wireFileDrop(target, onFiles) {
+export function wireFileDrop(target, onFiles) {
   target.addEventListener('dragover', (e) => {
     if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
     e.preventDefault();
@@ -341,8 +342,10 @@ export function renderSet(app) {
   if (st.tab === 'cards') body = cardList(app, set, st);
   else if (st.tab === 'points') body = keyPoints(set);
   else body = sourcesList(app, set);
+  body = el('div', {}, body, st.tab === 'cards' && questionBank(app, set));
 
-  return el('div', { class: 'set-page' }, header, modes, el('div', { class: 'card', style: { marginBottom: '16px' } }, orbitBar(set, { tall: true }), orbitLegend), el('div', { class: 'row', style: { marginBottom: '12px' } }, tabs), body);
+  const course = courseForSet(app, set);
+  return el('div', { class: 'set-page' }, course && el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px', marginBottom: '4px' }, onclick: () => app.go('course', { id: course.id, tab: 'units' }) }, '🎓 Back to course'), header, modes, el('div', { class: 'card', style: { marginBottom: '16px' } }, orbitBar(set, { tall: true }), orbitLegend), el('div', { class: 'row', style: { marginBottom: '12px' } }, tabs), body);
 }
 
 function cardList(app, set, st) {
@@ -874,11 +877,13 @@ export function renderStudy(app) {
     return renderHome(app);
   }
   const set = s.setId && setById(app, s.setId);
-  const titles = { cards: 'Flashcards', learn: 'Learn', test: 'Test', match: 'Match', review: 'Review' };
-  const back = () => {
-    if (s.mode === 'match' && s.timer) clearInterval(s.timer);
+  const titles = { cards: 'Flashcards', learn: 'Learn', test: 'Test', match: 'Match', review: 'Review', exam: s.kind === 'unit' ? 'Unit test' : 'Practice exam' };
+  const back = async () => {
+    if (s.mode === 'exam' && !['results'].includes(s.phase) && !(await confirmBox('Leave this test? Your answers will be lost.', { ok: 'Leave', danger: true }))) return;
+    if (s.timer) clearInterval(s.timer);
     app.viewState.study = null;
-    if (set) app.go('set', { id: set.id });
+    if (s.mode === 'exam') app.go('course', { id: s.courseId });
+    else if (set) app.go('set', { id: set.id });
     else app.go('home');
   };
   const top = el(
@@ -894,6 +899,7 @@ export function renderStudy(app) {
   else if (s.mode === 'match') body = renderMatch(app, s, set, top);
   else if (s.mode === 'review') body = renderReview(app, s, top);
   else if (s.mode === 'test') body = renderTest(app, s, set, top);
+  else if (s.mode === 'exam') body = renderExam(app, s, top);
   return el('div', { class: 'study' }, top, body);
 }
 

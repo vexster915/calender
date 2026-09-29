@@ -394,7 +394,7 @@ async function enter(session) {
   if (!data) data = emptyData();
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
-  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs']) data[key] ||= [];
+  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses']) data[key] ||= [];
   data.studyLog ||= {};
   app.session = session;
   app.data = data;
@@ -419,7 +419,7 @@ function renderShell() {
   const keepQuick = activeEl?.id === 'quick-input' ? { value: activeEl.value, pos: activeEl.selectionStart } : null;
   clear(root);
 
-  const isOn = (id) => app.view === id || (id === 'library' && ['set', 'study'].includes(app.view));
+  const isOn = (id) => app.view === id || (id === 'library' && ['set', 'study'].includes(app.view)) || (id === 'courses' && app.view === 'course');
   const navBtn = (id) => {
     const v = VIEWS[id];
     const badge = v.badge?.(app);

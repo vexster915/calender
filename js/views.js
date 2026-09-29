@@ -12,6 +12,7 @@ import { modal, confirmBox, toast, svg, confetti } from './ui.js';
 import * as vault from './vault.js';
 import { gallery, renderFiles, openSchedule } from './attach.js';
 import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, deleteSet } from './study.js';
+import { renderCourses, renderCourse } from './ap.js';
 import { dueCount } from './srs.js';
 
 // ------------------------------------------------------------------ shared bits
@@ -1573,6 +1574,7 @@ function renderSettings(app) {
                 app.data.attachments = [];
                 for (const set of [...app.data.sets]) await deleteSet(app, set);
                 app.data.docs = [];
+                app.data.courses = [];
                 app.data.studyLog = {};
                 app.data.settings = settings;
                 app.commit();
@@ -1696,6 +1698,8 @@ export const VIEWS = {
   home: { label: 'Home', icon: '🏠', render: renderHome, mobile: true },
   library: { label: 'Library', icon: '📚', render: renderLibrary, mobile: true },
   review: { label: 'Review', icon: '🧠', render: renderReviewHub, mobile: true, badge: (app) => dueCount(app.data) },
+  courses: { label: 'AP & Courses', short: 'AP', icon: '🎓', render: renderCourses, mobile: false },
+  course: { label: 'Course', icon: '🎓', render: renderCourse },
   planner: { label: 'Planner', icon: '🗓', render: renderPlanner, mobile: true },
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
   files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },
@@ -1705,7 +1709,7 @@ export const VIEWS = {
   study: { label: 'Study', icon: '🪐', render: renderStudy },
 };
 export const NAV_GROUPS = [
-  ['Study', ['home', 'library', 'review']],
+  ['Study', ['home', 'library', 'review', 'courses']],
   ['Plan', ['planner', 'classes', 'files']],
   ['Tools', ['focus', 'settings']],
 ];

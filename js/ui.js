@@ -103,6 +103,7 @@ export function toast(message, { action, onAction, ms = 3200 } = {}) {
   );
   box.appendChild(t);
   setTimeout(() => t.remove(), ms);
+  return t;
 }
 
 const CONFETTI_COLORS = ['#8b6cff', '#ff6b8b', '#1fc8a9', '#ffb020', '#3aa0ff'];
