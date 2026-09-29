@@ -1,0 +1,11 @@
+{
+  "name": "Orbit — School Planner",
+  "short_name": "Orbit",
+  "description": "An encrypted, offline-first planner for school.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e0b1f",
+  "theme_color": "#0e0b1f",
+  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
