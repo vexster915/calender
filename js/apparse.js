@@ -8,11 +8,13 @@ import { generateCards, cleanText } from './gen.js';
 // History CEDs use key-concept codes like "KC-3.1.I.A". We pull those statements and file them
 // under the unit given by the surrounding "TOPIC u.t" heading.
 const CODE = /\b((?:[A-Z]{2,5})-\d+(?:\.[A-Z0-9]{1,4}){1,4})\b/g;
+// 2025+ CEDs number everything by unit: "3.1.A" = learning objective, "3.1.A.1" = essential knowledge.
+const NUMCODE = /(?<![\w.-])(\d{1,2}\.\d{1,2}\.[A-Z](?:\.\d{1,2})?)(?![\d.A-Za-z])/g;
 const LO_VERB = /^(describe|explain|identify|calculate|determine|represent|compare|analyze|analyse|evaluate|justify|predict|construct|interpret|use|apply|create|develop|define|relate|make|select|articulate|connect|sketch)\b/i;
 
 const TOPIC_LINE = /^(?:TOPIC\s+)?(\d{1,2})\.(\d{1,2})\s+([A-Z][A-Za-z0-9 ,:;'’()\-–&/]{2,80})$/;
 const HISTORY_LO = /\bLearning Objective\s+([A-Z])\s+((?:Explain|Describe|Compare|Analyze|Analyse|Identify|Evaluate)\b[^.]{10,260}\.)/g;
-const NOISE = /\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$|Learning Objective [A-Z]\b.*$)/g;
+const NOISE = /\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$|Learning Objective [A-Z]\b.*$|SUGGESTED SKILLS.*$|BIG IDEA \d.*$|AVAILABLE RESOURCES.*$|Course Framework.*$|\bX?\s*EXCLUSION STATEMENT.*$|ILLUSTRATIVE EXAMPLES?.*$|RELEVANT EQUATIONS.*$|\s§\s.*$)/g;
 
 export function parseCED(raw, course) {
   // Rebuild the text on one line but remember where each original line started, so line-based
@@ -33,7 +35,9 @@ export function parseCED(raw, course) {
     if (u < 0 || u >= units.length) return;
     markers.push({ at, u });
     const num = `${un}.${tn}`;
-    if (!units[u].topics.some((t) => t.num === num)) units[u].topics.push({ num, title: title.trim() });
+    const clean = title.replace(/\s*continued on next page.*$/i, '').trim();
+    const have = units[u].topics.find((t) => t.num === num);
+    if (!have) units[u].topics.push({ num, title: clean });
   };
   for (const m of text.matchAll(/\bTOPIC\s+(\d{1,2})\.(\d{1,2})\s+([A-Z][^.]{2,90}?)(?=\s+(?:Required|SUGGESTED|Suggested|ENDURING|LEARNING|Learning|THEMATIC|Thematic|Skill|SKILL|AVAILABLE|Available|\d+\.\d|$))/g)) addTopic(m.index, m[1], m[2], m[3]);
   lines.forEach((l, i) => {
@@ -55,21 +59,31 @@ export function parseCED(raw, course) {
   };
 
   // Coded statements: learning objectives ("ENE-1.D …") and essential knowledge ("ENE-1.D.1 …").
-  const codes = [...text.matchAll(CODE)];
-  const seen = new Set();
+  const codes = [...text.matchAll(CODE), ...text.matchAll(NUMCODE)].sort((a, b) => a.index - b.index);
+  const byCode = new Map();
   codes.forEach((m, i) => {
     const code = m[1];
     const end = i + 1 < codes.length ? codes[i + 1].index : Math.min(text.length, m.index + 600);
-    const body = text.slice(m.index + code.length, end).replace(NOISE, ' ').replace(/\s+/g, ' ').trim();
-    if (body.length < 12 || seen.has(code)) return;
-    const u = unitAt(m.index);
-    if (u < 0) return;
-    seen.add(code);
-    const firstStop = body.search(/(?<=[.?!])\s+(?=[A-Z])/);
-    const isLO = /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code) && !/^KC-/.test(code));
-    if (isLO) units[u].los.push({ code, at: m.index, text: firstStop > 0 ? body.slice(0, firstStop) : body.slice(0, 220) });
-    else units[u].eks.push({ code, at: m.index, text: body.slice(0, 420) });
+    const body = text
+      .slice(m.index + code.length, end)
+      .replace(NOISE, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+(?:i|ii|iii|iv|v|vi)\.?$/, '')
+      .trim();
+    if (body.length < 12) return;
+    const numeric = /^\d/.test(code);
+    const u = numeric ? parseInt(code, 10) - start : unitAt(m.index);
+    if (u < 0 || u >= units.length) return;
+    const isLO = numeric ? /\.[A-Z]$/.test(code) : /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code) && !/^KC-/.test(code));
+    // First sentence — but don't stop at list markers like "i." / "ii.".
+    const firstStop = body.search(/(?<!\b(?:i|ii|iii|iv|v|vi|vii|viii)\.)(?<=[.?!])\s+(?=[A-Z])/);
+    const textOut = isLO ? (firstStop > 0 && firstStop < 300 ? body.slice(0, firstStop) : body.slice(0, 300)) : body.slice(0, 480);
+    // CEDs repeat codes (tables, summaries) — keep the fullest version.
+    const prev = byCode.get(code);
+    if (!prev || textOut.length > prev.text.length) byCode.set(code, { code, at: prev?.at ?? m.index, text: textOut, u, isLO });
   });
+  for (const x of byCode.values()) (x.isLO ? units[x.u].los : units[x.u].eks).push({ code: x.code, at: x.at, text: x.text });
+  for (const u of units) u.eks.sort((a, b) => a.at - b.at);
   // History CEDs: "Learning Objective A  Explain the context in which…"
   for (const m of text.matchAll(HISTORY_LO)) {
     const u = unitAt(m.index);
@@ -98,7 +112,9 @@ export function cedCards(unit) {
     cards.push({ term: lo.text.replace(/\.$/, ''), def: pick.map((e) => e.text).join(' '), kind: 'qa', tag: lo.code });
   });
   // Essential knowledge text → definitions & fill-in-the-blank facts.
-  const g = generateCards(unit.eks.map((e) => e.text).join('\n\n'), { maxCards: 40 });
+  // Skip formula-sheet fragments and example lists when mining facts.
+  const clean = unit.eks.map((e) => e.text).filter((t) => !/[=§]|\bX\s*—/.test(t));
+  const g = generateCards(clean.join('\n\n'), { maxCards: 40 });
   cards.push(...g.cards);
   return { cards, keyPoints: g.keyPoints, topics: unit.topics.map((t) => `${t.num} ${t.title}`) };
 }
@@ -156,8 +172,17 @@ export function parseMCQ(raw) {
 
 // ---------------- Free-response prompts ----------------
 export function splitFRQ(raw) {
-  const text = cleanText(raw);
-  const parts = text.split(/\n\s*(?=(?:question\s+)?\d{1,2}[.)]\s)/i).map((p) => p.trim()).filter((p) => p.length > 60);
+  // Drop page furniture from released exams (copyright lines, headers, "GO ON TO THE NEXT PAGE").
+  const text = cleanText(raw)
+    .split('\n')
+    .filter((l) => !/©\s*\d{4} College Board|Visit College Board|collegeboard\.org|GO ON TO THE NEXT PAGE|^\s*AP [A-Z ]+\d{4}.*FREE-RESPONSE QUESTIONS\s*$|^\s*STOP\s*$|^\s*END OF EXAM\s*$/i.test(l))
+    .join('\n');
+  const parts = text
+    .split(/\n\s*(?=(?:question\s+)?\d{1,2}[.)]\s)/i)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 60)
+    // Skip cover pages and directions blocks.
+    .filter((p) => !/\bDirections:|Free-Response Questions\s*$|^\d{4}\s+AP\b/i.test(p.slice(0, 400)) || /\?|\b(describe|explain|identify|justify|predict|calculate)\b/i.test(p.slice(0, 600)));
   return (parts.length ? parts : [text]).slice(0, 30).map((p) => p.replace(/^(?:question\s+)?\d{1,2}[.)]\s+/i, '').replace(/\n{3,}/g, '\n\n'));
 }
 

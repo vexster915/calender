@@ -15,12 +15,19 @@ export async function extractPdfText(bytes, onProgress) {
   const task = pdfjs.getDocument({
     data: bytes,
     isEvalSupported: false,
+    verbosity: 0,
     cMapUrl: `${base}cmaps/`,
     cMapPacked: true,
     standardFontDataUrl: `${base}standard_fonts/`,
     useSystemFonts: false,
   });
-  const doc = await task.promise;
+  let doc;
+  try {
+    doc = await task.promise;
+  } catch (err) {
+    if (/password/i.test(err?.name || err?.message)) throw new Error('This PDF is password-protected — open it, save an unlocked copy, and try again.');
+    throw new Error('That file isn’t a readable PDF (it may be damaged, or a web page saved with a .pdf name).');
+  }
   let meta = null;
   try {
     meta = await doc.getMetadata();

@@ -25,6 +25,7 @@ export function cleanText(raw) {
   return String(raw || '')
     .replace(/\r\n?/g, '\n')
     .replace(/[­​]/g, '') // soft hyphens, zero-width
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ') // stray control chars some PDFs use as spaces
     .replace(/[ \t ]+/g, ' ')
     .replace(/(\w)-\n(\w)/g, '$1$2') // re-join hyphenated line breaks
     .replace(/[“”]/g, '"')
@@ -158,7 +159,8 @@ function definitionSentenceCards(sentences) {
     let def = s.slice(m.index + m[0].length).trim();
     const tw = wordCount(term);
     if (!term || tw > 5 || PRONOUN_START.test(term) || /[,;:]/.test(term)) continue;
-    if (/^(not|also|often|usually|very|more|less|only|then|in|on|at|by|to|so)\b/i.test(def)) continue;
+    // Comparisons and locations ("X is higher than…", "X is embedded in…") aren't definitions.
+    if (/^(not|also|often|usually|very|more|less|only|then|in|on|at|by|to|so|higher|lower|greater|smaller|larger|found|located|embedded|used|either|present|absent|similar|different|equal|important|necessary|required|able|responsible|involved|associated|thought|believed|known|likely|unlikely|possible|made|composed|affected|influenced|determined)\b/i.test(def)) continue;
     if (wordCount(def) < 3) continue;
     // Term should look like a noun phrase: mostly content words.
     const content = term.split(/\s+/).filter((w) => !STOP.has(w.toLowerCase()));
