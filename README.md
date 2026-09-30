@@ -20,7 +20,9 @@ Everything runs in your browser and is hosted free on GitHub Pages. All your dat
 
 ## AP courses
 
-Pick your AP classes from the built-in catalog of **23 AP courses**. Each comes set up from its official College Board Course and Exam Description (CED): every unit with its exam weighting, the exam's sections, question counts, and timing, plus study tips.
+Pick your AP classes from the built-in catalog of **23 AP courses**. Each comes set up from its official College Board Course and Exam Description (CED): every unit with its exam weighting, the exam's sections, question counts, timing and official FRQ point values, plus study tips.
+
+The catalog was checked line by line against the **2025–26 CEDs** for all 23 courses. That includes the recent redesigns: the new 5-unit AP Statistics, the Calculus AB/BC reweighting and split multiple choice (29 + 13 questions), the 42-question Physics exams, and the renamed Biology and Chemistry units. **1,327 official topic titles** are built in, so every unit shows its topic list with "covered in class" checkboxes. Importing a course's CED then adds the full learning objectives and essential knowledge as cards (for example, about 360 cards for AP Biology). English Language and Literature, which are skills-based, get one Skills deck instead.
 
 - **Import the CED.** Upload the free CED PDF and Orbit reads each unit's topics, learning objectives, and essential knowledge, then turns them into cards for the right unit.
 - **AP Classroom material.** AP Classroom has no public API and sits behind your College Board sign-in, so Orbit can't (and shouldn't) log in for you. Instead, print any progress check or resource to PDF (Ctrl/⌘+P → Save as PDF) or copy its text, and add it. Orbit detects the unit and pulls out **multiple-choice questions with their answer keys** into a question bank. It makes flashcards from notes too.

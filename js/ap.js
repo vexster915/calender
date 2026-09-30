@@ -4,6 +4,7 @@ import { el, add, uid, fmtDate, clamp } from './util.js';
 import { modal, confirmBox, toast, confetti } from './ui.js';
 import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor, TASK_VERBS } from './apcatalog.js';
 import { parseCED, cedCards, parseMCQ, splitFRQ, detectUnit } from './apparse.js';
+import { AP_TOPICS } from './aptopics.js';
 import { generateCards } from './gen.js';
 import { newCard, grade, mastery, shuffle, logStudy } from './srs.js';
 import { orbitBar, ring, startStudy, wireFileDrop, pageTitle, setById, openCreateSet } from './study.js';
@@ -145,7 +146,7 @@ function addStep2(app, st, m) {
     'div',
     { class: 'stack' },
     el('div', { class: 'row' }, el('span', { class: 'dot', style: { background: info.color, width: '14px', height: '14px' } }), el('h3', { style: { margin: 0, textTransform: 'none', letterSpacing: 0, fontSize: '1.3em', color: 'var(--text)' } }, info.name)),
-    el('div', { class: 'unit-preview' }, info.units.map((u, i) => el('div', { class: 'row small' }, el('b', { style: { width: '72px' } }, unitLabel(info, i)), el('span', { style: { flex: 1 } }, u.title), el('span', { class: 'muted' }, u.weight)))),
+    el('div', { class: 'unit-preview' }, info.units.map((u, i) => el('div', { class: 'row small' }, el('b', { style: { width: '72px' } }, unitLabel(info, i)), el('span', { style: { flex: 1 } }, u.title), AP_TOPICS[info.key]?.[i]?.length ? el('span', { class: 'faint' }, `${AP_TOPICS[info.key][i].length} topics`) : null, el('span', { class: 'muted', style: { width: '70px', textAlign: 'right' } }, u.weight)))),
     el('div', { class: 'small muted' }, 'Exam: ', info.exam.map((s) => `${s.name} — ${s.count} q, ${s.minutes} min, ${s.weight}%`).join(' · ')),
     el('label', { class: 'field' }, el('span', {}, 'Link to a class (for your schedule, grades and exam boost)'), cls),
     el(
@@ -281,7 +282,7 @@ function buildStudyPlan(app, course, apExam) {
 
   // Priority per unit: exam weight × how much is still unmastered.
   const units = info.units
-    .map((u, i) => ({ i, w: weightMid(u.weight) }))
+    .map((u, i) => ({ i, w: /not/i.test(u.weight) ? 0 : weightMid(u.weight) || 10 })) // skills-based units count equally
     .filter((u) => u.w > 0)
     .map((u) => {
       const set = unitSet(app, course, u.i);
@@ -311,7 +312,7 @@ function focusNext(app, course, info) {
   const scored = info.units
     .map((u, i) => {
       const set = unitSet(app, course, i);
-      const w = weightMid(u.weight);
+      const w = /not/i.test(u.weight) ? 0 : weightMid(u.weight) || 10;
       if (!set || !w) return null;
       const has = set.cards.length || set.questions?.length;
       const m = set.cards.length ? mastery(set).pct / 100 : 0;
@@ -368,10 +369,21 @@ function trendChart(exams) {
 }
 
 function unitsTab(app, course, info) {
+  const open = (app.viewState.course.open ||= {});
+  const covered = (course.covered ||= {});
+  const skills = app.data.sets.find((x) => x.courseId === course.id && x.skills);
   return el(
     'div',
     { class: 'stack', style: { gap: '10px' } },
     focusNext(app, course, info),
+    skills &&
+      el(
+        'div',
+        { class: 'unit-row' },
+        el('div', { class: 'unit-num', style: { borderColor: info.color, color: info.color } }, '★'),
+        el('div', { style: { flex: 1 } }, el('b', {}, 'Skills (from the CED)'), el('div', { class: 'small muted' }, `${skills.cards.length} cards · ${mastery(skills).pct}% mastered — used in every unit`)),
+        el('button', { class: 'btn sm primary', onclick: () => app.go('set', { id: skills.id }) }, 'Study'),
+      ),
     info.units.map((u, i) => {
       const set = unitSet(app, course, i);
       if (!set) return null;
@@ -379,7 +391,9 @@ function unitsTab(app, course, info) {
       const qn = set.questions?.length || 0;
       const empty = !set.cards.length && !qn;
       const lastTest = course.exams.filter((e) => e.kind === 'unit' && e.unit === i).at(-1);
-      return el(
+      const topics = AP_TOPICS[course.key]?.[i] || [];
+      const done = topics.filter(([n]) => covered[n]).length;
+      const row = el(
         'div',
         { class: 'unit-row' },
         el('div', { class: 'unit-num', style: { borderColor: info.color, color: info.color } }, String((info.unitStart || 1) + i)),
@@ -398,12 +412,40 @@ function unitsTab(app, course, info) {
           el('button', { class: 'btn sm primary', disabled: empty, onclick: () => startExam(app, course, { kind: 'unit', unit: i }) }, 'Unit test'),
         ),
       );
+      if (!topics.length) return row;
+      // Official topic list, with "covered in class" checkboxes.
+      const toggle = el('button', { class: 'topic-toggle', onclick: () => ((open[i] = !open[i]), app.render()) }, `${open[i] ? '▾' : '▸'} ${topics.length} official topics`, done ? el('span', { class: 'muted' }, ` · ${done}/${topics.length} covered in class`) : null);
+      return el(
+        'div',
+        { class: 'unit-wrap' },
+        row,
+        el(
+          'div',
+          { class: 'topic-panel' },
+          toggle,
+          open[i] &&
+            el(
+              'div',
+              { class: 'topic-list' },
+              topics.map(([n, t]) => {
+                const cb = el('input', { type: 'checkbox', class: 'check sq', checked: !!covered[n] });
+                cb.addEventListener('change', () => {
+                  if (cb.checked) covered[n] = true;
+                  else delete covered[n];
+                  app.commit();
+                });
+                return el('label', { class: `topic${covered[n] ? ' done' : ''}` }, cb, el('b', {}, n), el('span', {}, t));
+              }),
+              el('div', { class: 'row small', style: { marginTop: '6px' } }, el('button', { class: 'btn sm ghost', onclick: () => (topics.forEach(([n]) => (covered[n] = true)), app.commit()) }, 'Mark all covered'), el('button', { class: 'btn sm ghost', onclick: () => (topics.forEach(([n]) => delete covered[n]), app.commit()) }, 'Clear')),
+            ),
+        ),
+      );
     }),
   );
 }
 
 function examTab(app, course, info) {
-  const total = course.unitSets.map((id) => setById(app, id)).filter(Boolean);
+  const total = [...course.unitSets.map((id) => setById(app, id)), app.data.sets.find((x) => x.courseId === course.id && x.skills)].filter(Boolean);
   const content = total.reduce((n, s) => n + s.cards.length + (s.questions?.length || 0), 0);
   const covered = total.filter((s) => s.cards.length || s.questions?.length).length;
   const hist = [...course.exams].reverse();
@@ -578,10 +620,19 @@ async function importCED(app, course, file) {
       toast('Couldn’t find CED learning objectives in that PDF. Is it the Course and Exam Description? You can still add it as regular material.', { ms: 6000 });
       return;
     }
-    const summary = units.map((u, i) => {
-      const c = cedCards(u);
-      return { i, ...c, los: u.los.length, eks: u.eks.length };
-    });
+    // Skill-based courses (English) repeat the same skills in every unit: one Skills deck instead.
+    const summary = info.skillBased
+      ? [{ i: -1, ...cedCards({ topics: [], los: units.flatMap((u) => u.los), eks: units.flatMap((u) => u.eks).sort((a, b) => a.at - b.at) }, { maxCards: 120 }) }]
+      : units.map((u, i) => ({ i, ...cedCards(u), los: u.los.length, eks: u.eks.length }));
+    const setFor = (s) => {
+      if (s.i >= 0) return unitSet(app, course, s.i);
+      let set = app.data.sets.find((x) => x.courseId === course.id && x.skills);
+      if (!set) {
+        set = { id: uid(), title: `${info.name} · Skills (from the CED)`, classId: course.classId, courseId: course.id, skills: true, description: 'Official skills and essential knowledge for the course.', createdAt: new Date().toISOString(), lastStudied: null, cards: [], questions: [], docIds: [], keyPoints: [], topics: [], bestMatchMs: null, tests: [] };
+        app.data.sets.push(set);
+      }
+      return set;
+    };
     modal(
       'CED import',
       (m) =>
@@ -589,7 +640,7 @@ async function importCED(app, course, file) {
           'div',
           { class: 'stack' },
           el('p', { class: 'muted', style: { margin: 0 } }, `Found ${found} learning objectives and essential-knowledge statements. Here’s what each unit gets:`),
-          el('div', { class: 'unit-preview' }, summary.map((s) => el('div', { class: 'row small' }, el('b', { style: { width: '80px' } }, unitLabel(info, s.i)), el('span', { style: { flex: 1 } }, info.units[s.i].title), el('span', { class: 'muted' }, s.cards.length ? `${s.topics.length} topics · ${s.cards.length} cards` : '—')))),
+          el('div', { class: 'unit-preview' }, summary.map((s) => el('div', { class: 'row small' }, el('b', { style: { width: '80px' } }, s.i < 0 ? 'Skills' : unitLabel(info, s.i)), el('span', { style: { flex: 1 } }, s.i < 0 ? 'One deck of the course’s official skills (they repeat across all 9 units)' : info.units[s.i].title), el('span', { class: 'muted' }, s.cards.length ? `${s.topics.length} topics · ${s.cards.length} cards` : '—')))),
           el(
             'div',
             { class: 'row' },
@@ -603,8 +654,9 @@ async function importCED(app, course, file) {
                   let total = 0;
                   const docId = await saveDoc(app, doc, null);
                   for (const s of summary) {
-                    const set = unitSet(app, course, s.i);
-                    if (!set || !s.cards.length) continue;
+                    if (!s.cards.length) continue;
+                    const set = setFor(s);
+                    if (!set) continue;
                     total += addCardsToSet(set, s.cards);
                     set.topics = [...new Set([...(set.topics || []), ...s.topics])];
                     set.keyPoints = [...(set.keyPoints || []), ...s.keyPoints].slice(0, 20);
@@ -614,8 +666,9 @@ async function importCED(app, course, file) {
                   m.close();
                   app.commit();
                   confetti(window.innerWidth / 2, window.innerHeight / 3, 30);
-                  toast(`🔒 Added ${total} cards across ${summary.filter((s) => s.cards.length).length} units`);
-                  app.go('course', { tab: 'units' });
+                  toast(info.skillBased ? `🔒 Added ${total} skill cards` : `🔒 Added ${total} cards across ${summary.filter((s) => s.cards.length).length} units`);
+                  if (info.skillBased) app.go('set', { id: setFor(summary[0]).id });
+                  else app.go('course', { tab: 'units' });
                 },
               },
               'Add to units',
@@ -848,6 +901,8 @@ function allocate(total, weights) {
 
 // Distractors come from the same kind of card AND a similar answer length, so the right answer
 // can't be spotted just because it's the only long (or short) option.
+const ptsFor = (spec, i) => (Array.isArray(spec.pts) ? spec.pts[i % spec.pts.length] : spec.pts || 4);
+
 const grp = (c) => `${c.kind === 'cloze' ? 'cloze' : c.kind === 'qa' ? 'qa' : 'def'}:${c.def.length > 90 ? 'long' : 'short'}`;
 
 function cardQuestion(card, unitCards, courseCards) {
@@ -890,11 +945,13 @@ function buildExam(app, course, { kind, unit }) {
   const sections = [];
 
   // --- multiple choice ---
-  const mcqSpec = info.exam.find((s) => s.kind === 'mcq');
-  const perQ = mcqSpec.minutes / mcqSpec.count;
+  // Some exams split multiple choice into timed parts (e.g. Calculus: no-calculator + calculator).
+  const mcqSpecs = info.exam.filter((s) => s.kind === 'mcq');
+  const mcqTotal = mcqSpecs.reduce((t, s) => t + s.count, 0);
+  const perQ = mcqSpecs.reduce((t, s) => t + s.minutes, 0) / mcqTotal;
   const unitsInScope = kind === 'unit' ? [unit] : info.units.map((_, i) => i);
   const available = unitsInScope.map((i) => (sets[i]?.questions || []).filter((q) => q.answer !== null).length + (sets[i]?.cards.length || 0));
-  const target = kind === 'unit' ? Math.min(20, available[0]) : Math.round(mcqSpec.count * scale);
+  const target = kind === 'unit' ? Math.min(20, available[0]) : Math.round(mcqTotal * scale);
   const weights = unitsInScope.map((i, k) => (available[k] ? weightMid(info.units[i].weight) || 1 : 0));
   const per = allocate(target, weights);
   const mcqItems = [];
@@ -910,7 +967,30 @@ function buildExam(app, course, { kind, unit }) {
     const take = [...bank, ...made].slice(0, per[k]);
     take.forEach((q) => mcqItems.push({ ...q, unit: u, setId: set.id, given: null, flag: false }));
   });
-  if (mcqItems.length) sections.push({ kind: 'mcq', name: mcqSpec.name, note: mcqSpec.note, items: shuffle(mcqItems), minutes: Math.max(5, Math.round(perQ * mcqItems.length)), weight: mcqSpec.weight });
+  // Skills-based courses (English): the Skills deck supplies questions for full exams.
+  const skills = app.data.sets.find((x) => x.courseId === course.id && x.skills);
+  if (skills && kind !== 'unit' && mcqItems.length < target) {
+    const need = target - mcqItems.length;
+    shuffle(skills.cards)
+      .map((c) => cardQuestion(c, skills.cards, [...courseCards, ...skills.cards]))
+      .filter(Boolean)
+      .slice(0, need)
+      .forEach((q) => mcqItems.push({ ...q, unit: null, setId: skills.id, given: null, flag: false }));
+  }
+  const pool = shuffle(mcqItems);
+  if (kind === 'unit' || mcqSpecs.length === 1) {
+    const spec = mcqSpecs[0];
+    const w = mcqSpecs.reduce((t, x) => t + x.weight, 0);
+    if (pool.length) sections.push({ kind: 'mcq', name: 'Multiple choice', note: kind === 'unit' ? '' : spec.note, items: pool, minutes: Math.max(5, Math.round(perQ * pool.length)), weight: w });
+  } else {
+    const split = allocate(pool.length, mcqSpecs.map((x) => x.count));
+    let at = 0;
+    mcqSpecs.forEach((spec, k) => {
+      const items = pool.slice(at, at + split[k]);
+      at += split[k];
+      if (items.length) sections.push({ kind: 'mcq', name: spec.name, note: spec.note, items, minutes: Math.max(3, Math.round((spec.minutes / spec.count) * items.length)), weight: spec.weight });
+    });
+  }
 
   // --- free response ---
   if (kind !== 'mcq') {
@@ -919,16 +999,20 @@ function buildExam(app, course, { kind, unit }) {
     const bank = course.frqs.filter((f) => kind !== 'unit' || f.unit === null || f.unit === unit);
     let bankPool = shuffle(bank);
     let loPool = shuffle(loCards);
+    const built = shuffle(info.prompts || []);
     for (const spec of frqSpecs) {
       const count = kind === 'unit' ? 1 : Math.max(1, Math.round(spec.count * scale));
       const items = [];
       for (let i = 0; i < count; i++) {
         if (bankPool.length) {
           const f = bankPool.shift();
-          items.push({ prompt: f.prompt, model: f.rubric || '', unit: f.unit, response: '', max: spec.pts || 4, pts: null });
+          items.push({ prompt: f.prompt, model: f.rubric || '', unit: f.unit, response: '', max: ptsFor(spec, items.length), pts: null });
         } else if (loPool.length) {
           const { c, u } = loPool.shift();
-          items.push({ prompt: `${c.term}. Use specific evidence and course vocabulary in your answer.`, model: c.def, unit: u, response: '', max: spec.pts || 4, pts: null });
+          items.push({ prompt: `${c.term}. Use specific evidence and course vocabulary in your answer.`, model: c.def, unit: u, response: '', max: ptsFor(spec, items.length), pts: null });
+        } else if (built.length) {
+          const b = built.shift();
+          items.push({ prompt: b.prompt, model: b.rubric, unit: null, response: '', max: ptsFor(spec, items.length), pts: null });
         }
       }
       if (items.length) sections.push({ kind: 'frq', name: spec.name, note: spec.note, items, minutes: Math.max(5, Math.round((spec.minutes / spec.count) * items.length)), weight: spec.weight });
@@ -1200,6 +1284,7 @@ function renderResults(app, s, course, info) {
   s.keys = {};
   const weak = Object.entries(r.byUnit)
     .map(([u, b]) => ({ u: parseInt(u, 10), ...b, pct: (b.right / b.total) * 100 }))
+    .filter((w) => !Number.isNaN(w.u)) // skills-deck questions have no unit
     .sort((a, b) => a.pct - b.pct);
   const mcq = s.sections.filter((x) => x.kind === 'mcq').flatMap((x) => x.items);
   return el(

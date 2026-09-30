@@ -15,7 +15,8 @@
 import * as files from './files.js';
 
 const ACCOUNTS_KEY = 'orbit.accounts';
-const DATA_PREFIX = 'orbit.data.';
+const DATA_PREFIX = 'orbit.data.'; // legacy location
+const dataKey = (user) => `data:${user}`;
 const THROTTLE_PREFIX = 'orbit.throttle.';
 export const PBKDF2_ITERATIONS = 600000; // OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
 const enc = new TextEncoder();
@@ -206,15 +207,21 @@ export class Session {
     this.username = username;
     this.dek = dek;
   }
+  // The encrypted planner lives in IndexedDB (far more room than localStorage's ~5 MB).
+  // Older versions kept it in localStorage; it's moved over on first save.
+  async readBox() {
+    return (await files.getBlob(dataKey(this.user))) || JSON.parse(localStorage.getItem(DATA_PREFIX + this.user) || 'null');
+  }
   async load() {
-    const raw = localStorage.getItem(DATA_PREFIX + this.user);
-    if (!raw) return null;
-    const bytes = await open(this.dek, JSON.parse(raw), `data:${this.user}`);
+    const box = await this.readBox();
+    if (!box) return null;
+    const bytes = await open(this.dek, box, `data:${this.user}`);
     return JSON.parse(dec.decode(bytes));
   }
   async save(data) {
     const box = await seal(this.dek, enc.encode(JSON.stringify(data)), `data:${this.user}`);
-    localStorage.setItem(DATA_PREFIX + this.user, JSON.stringify(box));
+    await files.putBlob(dataKey(this.user), box);
+    localStorage.removeItem(DATA_PREFIX + this.user);
   }
   async changePassword(currentPw, newPw) {
     const accounts = readAccounts();
@@ -283,7 +290,7 @@ export class Session {
       version: 2,
       exportedAt: new Date().toISOString(),
       account: readAccounts()[this.user],
-      data: JSON.parse(localStorage.getItem(DATA_PREFIX + this.user)),
+      data: await this.readBox(),
       files: blobs,
     };
   }
@@ -292,6 +299,7 @@ export class Session {
     delete accounts[this.user];
     writeAccounts(accounts);
     localStorage.removeItem(DATA_PREFIX + this.user);
+    await files.deleteBlob(dataKey(this.user)).catch(() => {});
     clearFailures(this.user);
     await files.deletePrefix(`${this.user}/`).catch(() => {});
     this.dek = null;
@@ -418,7 +426,8 @@ export async function importBackup(backup, password) {
   for (const [id, box] of blobs) await open(dek, box, `file:${user}:${id}`);
   accounts[user] = rec;
   writeAccounts(accounts);
-  localStorage.setItem(DATA_PREFIX + user, JSON.stringify(backup.data));
+  await files.putBlob(dataKey(user), backup.data);
+  localStorage.removeItem(DATA_PREFIX + user);
   await files.deletePrefix(`${user}/`);
   for (const [id, box] of blobs) await files.putBlob(`${user}/${id}`, { iv: unb64(box.iv), ct: unb64(box.ct) });
   clearFailures(user);

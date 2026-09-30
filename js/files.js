@@ -22,7 +22,8 @@ function tx(mode, fn) {
       new Promise((resolve, reject) => {
         const t = d.transaction(STORE, mode);
         const result = fn(t.objectStore(STORE));
-        t.oncomplete = () => resolve(result?.result ?? result);
+        // A missing key must resolve to undefined (not the request object).
+        t.oncomplete = () => resolve(result instanceof IDBRequest ? result.result : result);
         t.onerror = () => reject(t.error);
         t.onabort = () => reject(t.error || new Error('Storage aborted — the device may be out of space.'));
       }),

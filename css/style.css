@@ -2053,6 +2053,53 @@ input[type='color'] {
   background: var(--bg-2);
 }
 
+.unit-wrap {
+  border-radius: var(--radius);
+}
+.unit-wrap .unit-row {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.topic-panel {
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 6px 16px 8px 74px;
+  background: var(--panel);
+}
+.topic-toggle {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.topic-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 4px 16px;
+  margin-top: 6px;
+}
+.topic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86em;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.topic b {
+  width: 38px;
+  flex: none;
+  color: var(--muted);
+}
+.topic.done span {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
 /* study session */
 .main.focus-mode {
   max-width: 980px;

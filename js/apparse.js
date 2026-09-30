@@ -14,7 +14,23 @@ const LO_VERB = /^(describe|explain|identify|calculate|determine|represent|compa
 
 const TOPIC_LINE = /^(?:TOPIC\s+)?(\d{1,2})\.(\d{1,2})\s+([A-Z][A-Za-z0-9 ,:;'’()\-–&/]{2,80})$/;
 const HISTORY_LO = /\bLearning Objective\s+([A-Z])\s+((?:Explain|Describe|Compare|Analyze|Analyse|Identify|Evaluate)\b[^.]{10,260}\.)/g;
-const NOISE = /\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$|Learning Objective [A-Z]\b.*$|SUGGESTED SKILLS.*$|BIG IDEA \d.*$|AVAILABLE RESOURCES.*$|Course Framework.*$|\bX?\s*EXCLUSION STATEMENT.*$|ILLUSTRATIVE EXAMPLES?.*$|RELEVANT EQUATIONS.*$|\s§\s.*$)/g;
+const NOISE = /\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$|Learning Objective [A-Z]\b.*$|SUGGESTED SKILLS.*$|BIG IDEA \d.*$|AVAILABLE RESOURCES.*$|Course Framework.*$|\bX?\s*EXCLUSION STATEMENT.*$|ILLUSTRATIVE EXAMPLES?.*$|RELEVANT EQUATIONS.*$)/g;
+
+function tidyTopic(t) {
+  let s = t
+    .replace(/\s*R+equi.*$/i, '')
+    .replace(/\s*\w{0,4}n to (?:table of )?contents.*$/i, '')
+    .replace(/\s*Course\b[\w\s]{0,12}Framework.*$/i, '')
+    .replace(/\s+Course(?:\s+\w{1,5}){1,3}$/, '')
+    .replace(/\s+(?:For\s+[A-Z]{2,5}-\d|§).*$/, '')
+    .replace(/\bpK a\b/g, 'pKa')
+    .replace(/\be x\b/g, 'eˣ')
+    .replace(/\s*\b(?:ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|Required Course Content).*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (/\bbc only\b/i.test(s)) s = `${s.replace(/\s*\bbc only\b.*$/i, '')} (BC only)`;
+  return s;
+}
 
 export function parseCED(raw, course) {
   // Rebuild the text on one line but remember where each original line started, so line-based
@@ -29,8 +45,10 @@ export function parseCED(raw, course) {
   text = text.replace(/ {2,}/g, ' ');
   const units = course.units.map(() => ({ topics: [], los: [], eks: [] }));
   const start = course.unitStart || 1;
+  const unitNames = new Set(course.units.map((u) => u.title.toLowerCase()));
+  const CONNECTOR = /\b(and|of|the|in|to|for|with|on|by|a|an|or|using)$|[,:]$/i;
   const markers = [];
-  const addTopic = (at, un, tn, title) => {
+  const addTopic = (at, un, tn, title, authoritative = false) => {
     const u = parseInt(un, 10) - start;
     if (u < 0 || u >= units.length) return;
     markers.push({ at, u });
@@ -38,11 +56,44 @@ export function parseCED(raw, course) {
     const clean = title.replace(/\s*continued on next page.*$/i, '').trim();
     const have = units[u].topics.find((t) => t.num === num);
     if (!have) units[u].topics.push({ num, title: clean });
+    else if (authoritative) have.title = clean;
   };
-  for (const m of text.matchAll(/\bTOPIC\s+(\d{1,2})\.(\d{1,2})\s+([A-Z][^.]{2,90}?)(?=\s+(?:Required|SUGGESTED|Suggested|ENDURING|LEARNING|Learning|THEMATIC|Thematic|Skill|SKILL|AVAILABLE|Available|\d+\.\d|$))/g)) addTopic(m.index, m[1], m[2], m[3]);
+  // Authoritative titles come from each topic's own page: a "TOPIC 4.5" line followed by the title
+  // (possibly wrapped over a few lines). Unit-at-a-glance tables are only a fallback.
+  // Section headings end a title; page furniture (running headers, page numbers) is skipped over.
+  const STOP = /^(Required Course Content|LEARNING OBJECTIVE|SUGGESTED|ENDURING|BIG IDEA|THEMATIC|Thematic Focus|AVAILABLE|ESSENTIAL|TOPIC\s+\d|Skills?\b|Science Practice|[A-Z]{2,4}-\d)/i;
+  const FURNITURE = /^(UNIT|PERIOD|\d{1,3}|Course\s*Framework.*|Return to.*|©.*|AP [A-Z].*Course and Exam Description.*|.*\|\s*\d+.*)$/i;
+  const fromPages = new Map();
+  lines.forEach((l, i) => {
+    const m = l.trim().match(/^TOPIC\s+(\d{1,2})\.(\d{1,2})\s*(.*)$/);
+    if (!m) return;
+    const parts = m[3] ? [m[3]] : [];
+    for (let j = i + 1; j < Math.min(lines.length, i + 20) && parts.length < 8; j++) {
+      const t = lines[j].trim();
+      if (!t || FURNITURE.test(t)) continue;
+      if (STOP.test(t) || t.length > 55) break; // headings are short; a long line is body text
+      // The unit name also appears as a running header — skip it unless the title is mid-phrase.
+      if (unitNames.has(t.toLowerCase()) && parts.length && !CONNECTOR.test(parts.join(' '))) continue;
+      parts.push(t);
+    }
+    const title = tidyTopic(parts.join(' '));
+    if (title.length >= 3 && title.length <= 120) {
+      fromPages.set(`${m[1]}.${m[2]}`, true);
+      addTopic(lineAt[i], m[1], m[2], title, true);
+    }
+  });
   lines.forEach((l, i) => {
     const m = l.trim().match(TOPIC_LINE);
-    if (m && !/\d\s*%/.test(l)) addTopic(lineAt[i], m[1], m[2], m[3]);
+    if (!m || /\d\s*%/.test(l) || fromPages.has(`${m[1]}.${m[2]}`)) return;
+    let title = m[3];
+    // Table rows wrap too: "1.3 Rates of Change in" + "Linear and Quadratic Functions".
+    for (let j = i + 1; CONNECTOR.test(title) && j < Math.min(lines.length, i + 4); j++) {
+      const t = lines[j].trim();
+      if (!t) continue;
+      if (t.length > 45 || /^\d/.test(t) || STOP.test(t)) break;
+      title += ` ${t}`;
+    }
+    addTopic(lineAt[i], m[1], m[2], tidyTopic(title), false);
   });
   for (const m of text.matchAll(/\b(?:UNIT|Unit|PERIOD|Period)\s+(\d{1,2})\b/g)) {
     const u = parseInt(m[1], 10) - start;
@@ -66,15 +117,18 @@ export function parseCED(raw, course) {
     const end = i + 1 < codes.length ? codes[i + 1].index : Math.min(text.length, m.index + 600);
     const body = text
       .slice(m.index + code.length, end)
+      .replace(/\s§\s.*$/, '') // illustrative-example lists
       .replace(NOISE, ' ')
       .replace(/\s+/g, ' ')
       .replace(/\s+(?:i|ii|iii|iv|v|vi)\.?$/, '')
+      .replace(/\s+\d\.[A-Z](?=\s|$).*$/, '') // trailing skill codes like "1.C"
       .trim();
     if (body.length < 12) return;
     const numeric = /^\d/.test(code);
     const u = numeric ? parseInt(code, 10) - start : unitAt(m.index);
     if (u < 0 || u >= units.length) return;
-    const isLO = numeric ? /\.[A-Z]$/.test(code) : /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code) && !/^KC-/.test(code));
+    // English CEDs code every statement ("CLE-1.Y") as essential knowledge — no objectives to pair.
+    const isLO = course.skillBased ? false : numeric ? /\.[A-Z]$/.test(code) : /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code) && !/^KC-/.test(code));
     // First sentence — but don't stop at list markers like "i." / "ii.".
     const firstStop = body.search(/(?<!\b(?:i|ii|iii|iv|v|vi|vii|viii)\.)(?<=[.?!])\s+(?=[A-Z])/);
     const textOut = isLO ? (firstStop > 0 && firstStop < 300 ? body.slice(0, firstStop) : body.slice(0, 300)) : body.slice(0, 480);
@@ -96,7 +150,7 @@ export function parseCED(raw, course) {
 }
 
 // Turn one parsed CED unit into study cards.
-export function cedCards(unit) {
+export function cedCards(unit, { maxCards = 40 } = {}) {
   const cards = [];
   // Learning objective → its essential knowledge (these double as short free-response prompts).
   unit.los.forEach((lo, i) => {
@@ -114,7 +168,7 @@ export function cedCards(unit) {
   // Essential knowledge text → definitions & fill-in-the-blank facts.
   // Skip formula-sheet fragments and example lists when mining facts.
   const clean = unit.eks.map((e) => e.text).filter((t) => !/[=§]|\bX\s*—/.test(t));
-  const g = generateCards(clean.join('\n\n'), { maxCards: 40 });
+  const g = generateCards(clean.join('\n\n'), { maxCards });
   cards.push(...g.cards);
   return { cards, keyPoints: g.keyPoints, topics: unit.topics.map((t) => `${t.num} ${t.title}`) };
 }
