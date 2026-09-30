@@ -2012,6 +2012,47 @@ input[type='color'] {
   font-weight: 800;
 }
 
+.explain {
+  font-size: 0.88em;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(58, 160, 255, 0.08);
+  color: var(--muted);
+}
+.resume-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid rgba(255, 176, 32, 0.4);
+}
+.focus-next {
+  background: linear-gradient(135deg, rgba(139, 108, 255, 0.12), rgba(31, 200, 169, 0.08)), var(--panel);
+}
+.trend {
+  width: 100%;
+  max-width: 560px;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+.verbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.verb {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-2);
+}
+
 /* study session */
 .main.focus-mode {
   max-width: 980px;

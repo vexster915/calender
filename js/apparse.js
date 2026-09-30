@@ -10,22 +10,37 @@ import { generateCards, cleanText } from './gen.js';
 const CODE = /\b((?:[A-Z]{2,5})-\d+(?:\.[A-Z0-9]{1,4}){1,4})\b/g;
 const LO_VERB = /^(describe|explain|identify|calculate|determine|represent|compare|analyze|analyse|evaluate|justify|predict|construct|interpret|use|apply|create|develop|define|relate|make|select|articulate|connect|sketch)\b/i;
 
+const TOPIC_LINE = /^(?:TOPIC\s+)?(\d{1,2})\.(\d{1,2})\s+([A-Z][A-Za-z0-9 ,:;'’()\-–&/]{2,80})$/;
+const HISTORY_LO = /\bLearning Objective\s+([A-Z])\s+((?:Explain|Describe|Compare|Analyze|Analyse|Identify|Evaluate)\b[^.]{10,260}\.)/g;
+const NOISE = /\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$|Learning Objective [A-Z]\b.*$)/g;
+
 export function parseCED(raw, course) {
-  const text = cleanText(raw).replace(/\s+/g, ' ');
+  // Rebuild the text on one line but remember where each original line started, so line-based
+  // headings (topic tables in "Unit at a Glance") can be placed too.
+  const lines = cleanText(raw).split('\n');
+  let text = '';
+  const lineAt = [];
+  for (const l of lines) {
+    lineAt.push(text.length);
+    text += `${l.trim()} `;
+  }
+  text = text.replace(/ {2,}/g, ' ');
   const units = course.units.map(() => ({ topics: [], los: [], eks: [] }));
   const start = course.unitStart || 1;
-
-  // Topic headings give us positions → unit numbers.
   const markers = [];
-  for (const m of text.matchAll(/\bTOPIC\s+(\d{1,2})\.(\d{1,2})\s+([A-Z][^.]{2,90}?)(?=\s+(?:Required|SUGGESTED|Suggested|ENDURING|LEARNING|Learning|THEMATIC|Thematic|Skill|SKILL|AVAILABLE|Available|\d+\.\d|$))/g)) {
-    const u = parseInt(m[1], 10) - start;
-    if (u >= 0 && u < units.length) {
-      markers.push({ at: m.index, u });
-      const title = m[3].trim();
-      if (!units[u].topics.some((t) => t.num === `${m[1]}.${m[2]}`)) units[u].topics.push({ num: `${m[1]}.${m[2]}`, title });
-    }
-  }
-  for (const m of text.matchAll(/\bUNIT\s+(\d{1,2})\b/g)) {
+  const addTopic = (at, un, tn, title) => {
+    const u = parseInt(un, 10) - start;
+    if (u < 0 || u >= units.length) return;
+    markers.push({ at, u });
+    const num = `${un}.${tn}`;
+    if (!units[u].topics.some((t) => t.num === num)) units[u].topics.push({ num, title: title.trim() });
+  };
+  for (const m of text.matchAll(/\bTOPIC\s+(\d{1,2})\.(\d{1,2})\s+([A-Z][^.]{2,90}?)(?=\s+(?:Required|SUGGESTED|Suggested|ENDURING|LEARNING|Learning|THEMATIC|Thematic|Skill|SKILL|AVAILABLE|Available|\d+\.\d|$))/g)) addTopic(m.index, m[1], m[2], m[3]);
+  lines.forEach((l, i) => {
+    const m = l.trim().match(TOPIC_LINE);
+    if (m && !/\d\s*%/.test(l)) addTopic(lineAt[i], m[1], m[2], m[3]);
+  });
+  for (const m of text.matchAll(/\b(?:UNIT|Unit|PERIOD|Period)\s+(\d{1,2})\b/g)) {
     const u = parseInt(m[1], 10) - start;
     if (u >= 0 && u < units.length) markers.push({ at: m.index, u, weak: true });
   }
@@ -39,27 +54,30 @@ export function parseCED(raw, course) {
     return u;
   };
 
-  // Split text at every code; each chunk is "CODE statement…".
+  // Coded statements: learning objectives ("ENE-1.D …") and essential knowledge ("ENE-1.D.1 …").
   const codes = [...text.matchAll(CODE)];
   const seen = new Set();
   codes.forEach((m, i) => {
     const code = m[1];
     const end = i + 1 < codes.length ? codes[i + 1].index : Math.min(text.length, m.index + 600);
-    let body = text
-      .slice(m.index + code.length, end)
-      .replace(/\b(ESSENTIAL KNOWLEDGE|LEARNING OBJECTIVE|ENDURING UNDERSTANDING|Required Course Content|EXCLUSION STATEMENT|HISTORICAL DEVELOPMENTS?|KEY CONCEPTS?|TOPIC \d+\.\d+.*$|UNIT \d+\b.*$|Illustrative Examples?.*$|AP [A-Z][a-z]+.*Course and Exam Description.*$|Course Framework V\.\d.*$|Return to Table of Contents.*$|© \d{4} College Board.*$)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    // Keep only the first sentence-ish run for LOs; EKs can be a couple of sentences.
+    const body = text.slice(m.index + code.length, end).replace(NOISE, ' ').replace(/\s+/g, ' ').trim();
     if (body.length < 12 || seen.has(code)) return;
-    const firstStop = body.search(/(?<=[.?!])\s+(?=[A-Z])/);
     const u = unitAt(m.index);
     if (u < 0) return;
     seen.add(code);
-    const isLO = /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code));
-    if (isLO) units[u].los.push({ code, text: firstStop > 0 ? body.slice(0, firstStop) : body.slice(0, 220) });
-    else units[u].eks.push({ code, text: body.slice(0, 420) });
+    const firstStop = body.search(/(?<=[.?!])\s+(?=[A-Z])/);
+    const isLO = /-\d+\.[A-Z]$/.test(code) || (LO_VERB.test(body) && !/\.\d+$/.test(code) && !/^KC-/.test(code));
+    if (isLO) units[u].los.push({ code, at: m.index, text: firstStop > 0 ? body.slice(0, firstStop) : body.slice(0, 220) });
+    else units[u].eks.push({ code, at: m.index, text: body.slice(0, 420) });
   });
+  // History CEDs: "Learning Objective A  Explain the context in which…"
+  for (const m of text.matchAll(HISTORY_LO)) {
+    const u = unitAt(m.index);
+    if (u < 0) continue;
+    const t = m[2].replace(/\s+/g, ' ').trim();
+    if (!units[u].los.some((x) => x.text === t)) units[u].los.push({ code: `LO-${u + start}${m[1]}-${m.index}`, at: m.index, text: t });
+  }
+  for (const u of units) u.los.sort((a, b) => a.at - b.at);
   return units;
 }
 
@@ -67,13 +85,18 @@ export function parseCED(raw, course) {
 export function cedCards(unit) {
   const cards = [];
   // Learning objective → its essential knowledge (these double as short free-response prompts).
-  for (const lo of unit.los) {
-    const eks = unit.eks.filter((ek) => ek.code.startsWith(`${lo.code}.`) || ek.code.startsWith(lo.code.replace(/\.[A-Z]$/, '')));
-    const own = eks.filter((ek) => ek.code.startsWith(`${lo.code}.`));
-    const pick = (own.length ? own : eks).slice(0, 2);
-    if (!pick.length) continue;
+  unit.los.forEach((lo, i) => {
+    let pick = unit.eks.filter((ek) => ek.code.startsWith(`${lo.code}.`));
+    if (!pick.length) {
+      // No shared code (history CEDs): use the statements that follow it, up to the next objective.
+      const next = unit.los[i + 1]?.at ?? Infinity;
+      pick = unit.eks.filter((ek) => ek.at > lo.at && ek.at < next);
+    }
+    if (!pick.length) pick = unit.eks.filter((ek) => ek.code.startsWith(lo.code.replace(/\.[A-Z]$/, '')));
+    pick = pick.slice(0, 3);
+    if (!pick.length) return;
     cards.push({ term: lo.text.replace(/\.$/, ''), def: pick.map((e) => e.text).join(' '), kind: 'qa', tag: lo.code });
-  }
+  });
   // Essential knowledge text → definitions & fill-in-the-blank facts.
   const g = generateCards(unit.eks.map((e) => e.text).join('\n\n'), { maxCards: 40 });
   cards.push(...g.cards);
@@ -85,35 +108,48 @@ export function cedCards(unit) {
 // "Answer: C", "Correct answer (C)", or an answer-key list "1. C 2. A 3. D" at the end.
 export function parseMCQ(raw) {
   const text = cleanText(raw).replace(/\r/g, '');
-  const keyAt = text.search(/\banswer\s+key\b|\banswers\b\s*\n/i);
+  const keyAt = text.search(/\banswer\s+key\b|\n\s*answers\s*\n/i);
   const body = keyAt > 200 ? text.slice(0, keyAt) : text;
   const key = new Map();
   if (keyAt > 200) {
     for (const m of text.slice(keyAt).matchAll(/(\d{1,3})\s*[.):\-]?\s*\(?([A-E])\)?(?=[\s,;]|$)/g)) key.set(parseInt(m[1], 10), m[2]);
   }
-  const starts = [...body.matchAll(/(?:^|\n)\s*(?:question\s*)?(\d{1,3})[.)]\s+(?=\S)/gi)];
+  // Question starts: "1.", "1)", "Question 1", "Question 1 of 20"
+  const starts = [...body.matchAll(/(?:^|\n)\s*(?:question\s+(\d{1,3})(?:\s+of\s+\d+)?\s*[.:)]?|(\d{1,3})[.)])\s+(?=\S)/gi)];
   const out = [];
+  const ANSWER = /\b(?:correct\s+answer|answer(?:\s+key)?|key)\s*(?:is)?\s*[:\-]?\s*\(?([A-Ea-e])\)?(?![A-Za-z])/i;
+  const EXPLAIN = /\b(?:explanation|rationale|reason|why)\s*[:\-]/i;
   starts.forEach((m, i) => {
-    const num = parseInt(m[1], 10);
+    const num = parseInt(m[1] || m[2], 10);
     const from = m.index + m[0].length;
     const to = i + 1 < starts.length ? starts[i + 1].index : body.length;
     const block = body.slice(from, to);
-    const marks = [...block.matchAll(/(?:^|\n|\s)\(?([A-E])[).]\s+(?=\S)/g)].filter((x, j, arr) => x[1] === 'ABCDE'[j] && (j === 0 || arr[j - 1].index < x.index));
+    // Choice markers: "(A) ", "A. ", "A) ", "a) ", or a letter alone on its own line.
+    const raw = [...block.matchAll(/(?:^|\n|\s)(?:\(([A-Ea-e])\)|([A-E])[.)]|([a-e])[.)]|([A-E])(?=\s*\n))\s*(?=\S)/g)].map((x) => ({ index: x.index, len: x[0].length, letter: (x[1] || x[2] || x[3] || x[4]).toUpperCase() }));
+    const marks = [];
+    for (const x of raw) if (x.letter === 'ABCDE'[marks.length]) marks.push(x);
     if (marks.length < 3) return;
     const stem = block.slice(0, marks[0].index).replace(/\s+/g, ' ').trim();
     if (stem.length < 8) return;
+    let explain = '';
     const choices = marks.map((mk, j) => {
       const end = j + 1 < marks.length ? marks[j + 1].index : block.length;
-      return block
-        .slice(mk.index + mk[0].length, end)
-        .replace(/\b(correct\s+)?answer\s*[:\-]?\s*\(?[A-E]\)?.*$/is, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      let c = block.slice(mk.index + mk.len, end);
+      const cut = c.search(new RegExp(`${ANSWER.source}|${EXPLAIN.source}`, 'i'));
+      if (cut >= 0) {
+        if (j === marks.length - 1) {
+          const tail = c.slice(cut);
+          const e = tail.search(EXPLAIN);
+          if (e >= 0) explain = tail.slice(e).replace(EXPLAIN, '').replace(/\s+/g, ' ').trim().slice(0, 600);
+        }
+        c = c.slice(0, cut);
+      }
+      return c.replace(/\s+/g, ' ').trim();
     });
     if (choices.some((c) => !c)) return;
-    const inline = block.match(/\b(?:correct\s+)?answer\s*(?:is)?\s*[:\-]?\s*\(?([A-E])\)?(?![a-z])/i);
+    const inline = block.slice(marks[0].index).match(ANSWER);
     const letter = inline?.[1] || key.get(num) || null;
-    out.push({ stem, choices, answer: letter ? 'ABCDE'.indexOf(letter.toUpperCase()) : null, num });
+    out.push({ stem, choices, answer: letter ? 'ABCDE'.indexOf(letter.toUpperCase()) : null, num, explain });
   });
   return out;
 }

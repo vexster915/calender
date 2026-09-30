@@ -1,8 +1,8 @@
 // AP courses: official unit structure, CED import, AP Classroom material, unit tests and
 // full practice AP exams built on the real exam format.
-import { el, add, uid, fmtDate, clamp, relDay } from './util.js';
+import { el, add, uid, fmtDate, clamp } from './util.js';
 import { modal, confirmBox, toast, confetti } from './ui.js';
-import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor } from './apcatalog.js';
+import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor, TASK_VERBS } from './apcatalog.js';
 import { parseCED, cedCards, parseMCQ, splitFRQ, detectUnit } from './apparse.js';
 import { generateCards } from './gen.js';
 import { newCard, grade, mastery, shuffle, logStudy } from './srs.js';
@@ -226,7 +226,12 @@ export function renderCourse(app) {
       ring(readiness(app, course), info.color, 92),
       el('div', { class: 'small muted' }, 'exam-weighted mastery'),
       apExam
-        ? el('div', { class: 'small', style: { marginTop: '4px' } }, `AP Exam ${relDay(new Date(apExam.due))}`)
+        ? el(
+            'div',
+            { class: 'stack', style: { gap: '6px', marginTop: '6px' } },
+            el('div', { class: 'small' }, el('b', {}, `${Math.max(0, Math.ceil((new Date(apExam.due) - new Date()) / 86400000))} days`), ` to the AP Exam (${fmtDate(apExam.due)})`),
+            el('button', { class: 'btn sm primary', onclick: () => buildStudyPlan(app, course, apExam) }, course.planBuilt ? '🗺 Rebuild study plan' : '🗺 Build my study plan'),
+          )
         : el('button', { class: 'btn sm', style: { marginTop: '6px' }, onclick: () => addExamDate(app, course) }, '📅 Add AP exam date'),
     ),
   );
@@ -243,13 +248,130 @@ export function renderCourse(app) {
   else if (st.tab === 'import') body = importTab(app, course, info);
   else body = formatTab(info);
 
-  return el('div', {}, header, el('div', { style: { marginBottom: '14px' } }, tabs), body);
+  const live = app.viewState.study?.session;
+  const resume =
+    live?.mode === 'exam' && live.courseId === course.id && live.phase !== 'results'
+      ? el('div', { class: 'resume-banner' }, el('span', {}, `⏱ “${live.title}” is still in progress${live.timed ? ' — the clock is running' : ''}.`), el('span', { class: 'spacer' }), el('button', { class: 'btn sm primary', onclick: () => app.go('study') }, 'Resume'))
+      : null;
+  return el('div', {}, resume, header, el('div', { style: { marginBottom: '14px' } }, tabs), body);
+}
+
+// ------------------------------------------------------------------ Study plan → Planner
+// Spreads unit reviews over the weeks before the AP Exam (more sessions for heavily weighted and
+// weaker units), then switches to weekly full practice exams for the final stretch.
+function buildStudyPlan(app, course, apExam) {
+  const info = infoOf(course);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const examDay = new Date(apExam.due);
+  const days = Math.floor((examDay - today) / 86400000);
+  if (days < 3) return toast('The exam is too close for a plan — do a practice exam and review your mistakes.');
+  // Remove the previous plan's unfinished sessions.
+  app.data.items = app.data.items.filter((i) => !(i.apPlan === course.id && !i.done));
+  const at = (d, h) => {
+    const x = new Date(today);
+    x.setDate(x.getDate() + d);
+    x.setHours(h, 0, 0, 0);
+    return x;
+  };
+  const item = (title, date, type, minutes, notes) => ({ id: uid(), title, type, classId: course.classId, due: date.toISOString(), estimateMin: minutes, weight: null, spentMin: 0, subtasks: [], plan: [{ id: uid(), day: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`, minutes, done: false }], notes, done: false, apPlan: course.id, createdAt: new Date().toISOString() });
+  const finalDays = Math.min(28, Math.floor(days / 3));
+  const reviewDays = days - finalDays;
+  const added = [];
+
+  // Priority per unit: exam weight × how much is still unmastered.
+  const units = info.units
+    .map((u, i) => ({ i, w: weightMid(u.weight) }))
+    .filter((u) => u.w > 0)
+    .map((u) => {
+      const set = unitSet(app, course, u.i);
+      const m = set && set.cards.length ? mastery(set).pct / 100 : 0;
+      return { ...u, p: u.w * (1.15 - m) };
+    });
+  const slots = Math.max(units.length, Math.min(units.length * 3, Math.floor((reviewDays * 3) / 7)));
+  const per = allocate(slots, units.map((u) => u.p)).map((n) => Math.max(1, n));
+  const order = units.flatMap((u, k) => Array(per[k]).fill(u.i)).sort((a, b) => a - b);
+  order.forEach((ui, k) => {
+    const d = 1 + Math.floor((k * Math.max(1, reviewDays - 1)) / order.length);
+    added.push(item(`${info.name}: review ${unitLabel(info, ui)} — ${info.units[ui].title}`, at(d, 19), 'reading', 40, 'Orbit → AP & Courses: study the unit set, then take the unit test.'));
+  });
+  // Final stretch: a full practice exam every week, plus a mistakes session mid-week.
+  for (let d = reviewDays + 1; d < days; d += 7) {
+    added.push(item(`${info.name}: full practice exam`, at(Math.min(d + 2, days - 1), 9), 'exam', info.exam.reduce((t, s) => t + s.minutes, 0), 'Orbit → AP & Courses → Practice exams. Timed, like the real thing.'));
+    if (d + 5 < days) added.push(item(`${info.name}: review mistakes + weakest unit`, at(d + 5, 19), 'reading', 40, 'Use “Study my mistakes” and Focus next.'));
+  }
+  app.data.items.push(...added);
+  course.planBuilt = new Date().toISOString();
+  app.commit();
+  toast(`🗺 Added ${added.length} study sessions to your Planner, up to ${fmtDate(examDay)}`, { action: 'View', onAction: () => app.go('horizon') });
+}
+
+// The unit most worth your time right now.
+function focusNext(app, course, info) {
+  const scored = info.units
+    .map((u, i) => {
+      const set = unitSet(app, course, i);
+      const w = weightMid(u.weight);
+      if (!set || !w) return null;
+      const has = set.cards.length || set.questions?.length;
+      const m = set.cards.length ? mastery(set).pct / 100 : 0;
+      const last = course.exams.filter((e) => e.kind === 'unit' && e.unit === i).at(-1);
+      const testGap = last ? 1 - last.pct / 100 : 0.6;
+      return { i, set, has, score: w * (1 - m) * (0.5 + testGap), m, last };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+  const top = scored.slice(0, 2);
+  if (!top.length) return null;
+  return el(
+    'div',
+    { class: 'card focus-next' },
+    el('h3', {}, '🎯 Focus next', el('span', { class: 'spacer' }), el('span', { class: 'faint small', style: { textTransform: 'none', letterSpacing: 0 } }, 'exam weight × what you haven’t mastered × recent test scores')),
+    top.map(({ i, set, has, m, last }) =>
+      el(
+        'div',
+        { class: 'row', style: { padding: '6px 0' } },
+        el('b', { style: { width: '80px' } }, unitLabel(info, i)),
+        el('div', { style: { flex: 1 } }, el('div', {}, info.units[i].title), el('div', { class: 'small muted' }, has ? `${Math.round(m * 100)}% mastered${last ? ` · last test ${Math.round(last.pct)}%` : ' · no unit test yet'} · ${info.units[i].weight} of the exam` : `No material yet · ${info.units[i].weight} of the exam`)),
+        has
+          ? el('div', { class: 'row', style: { gap: '6px' } }, el('button', { class: 'btn sm', disabled: set.cards.length < 2, onclick: () => startStudy(app, set.id, 'learn') }, 'Learn'), el('button', { class: 'btn sm primary', onclick: () => startExam(app, course, { kind: 'unit', unit: i }) }, 'Unit test'))
+          : el('button', { class: 'btn sm primary', onclick: () => openAddMaterial(app, course, i) }, '+ Add material'),
+      ),
+    ),
+  );
+}
+
+function trendChart(exams) {
+  const pts = exams.slice(-12);
+  if (pts.length < 2) return null;
+  const W = 520;
+  const H = 110;
+  const x = (i) => 20 + (i * (W - 40)) / (pts.length - 1);
+  const y = (p) => H - 14 - (p / 100) * (H - 28);
+  const ns = 'http://www.w3.org/2000/svg';
+  const svgEl = document.createElementNS(ns, 'svg');
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('class', 'trend');
+  const mk = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    svgEl.appendChild(n);
+    return n;
+  };
+  [30, 45, 58, 72].forEach((g, k) => {
+    mk('line', { x1: 20, x2: W - 20, y1: y(g), y2: y(g), stroke: 'currentColor', 'stroke-opacity': 0.12, 'stroke-dasharray': '3 4' });
+    mk('text', { x: W - 16, y: y(g) + 3, 'font-size': 9, fill: 'currentColor', 'fill-opacity': 0.5 }).textContent = String(k + 2);
+  });
+  mk('polyline', { points: pts.map((e, i) => `${x(i)},${y(e.pct)}`).join(' '), fill: 'none', stroke: '#8b6cff', 'stroke-width': 2.5, 'stroke-linejoin': 'round' });
+  pts.forEach((e, i) => mk('circle', { cx: x(i), cy: y(e.pct), r: 4, fill: e.kind === 'unit' ? '#1fc8a9' : '#ff6b8b' }));
+  return el('div', {}, svgEl, el('div', { class: 'small faint' }, '● pink = practice exam · ● teal = unit test · dashed lines = rough 2/3/4/5 thresholds'));
 }
 
 function unitsTab(app, course, info) {
   return el(
     'div',
     { class: 'stack', style: { gap: '10px' } },
+    focusNext(app, course, info),
     info.units.map((u, i) => {
       const set = unitSet(app, course, i);
       if (!set) return null;
@@ -316,6 +438,7 @@ function examTab(app, course, info) {
       'div',
       { class: 'card wide' },
       el('h3', {}, '📈 History'),
+      trendChart(course.exams),
       hist.length
         ? hist.map((e) =>
             el(
@@ -346,6 +469,7 @@ function formatTab(info) {
     'div',
     { class: 'dash' },
     el('div', { class: 'card' }, el('h3', {}, '🧾 Exam format'), formatTable(info), el('p', { class: 'small faint' }, 'From the official Course and Exam Description. AP Exams are taken digitally in the Bluebook app.')),
+    el('div', { class: 'card wide' }, el('h3', {}, '🗣 FRQ task verbs — what each one asks for'), el('div', { class: 'verbs' }, TASK_VERBS.map(([v, d]) => el('div', { class: 'verb' }, el('b', {}, v), el('span', { class: 'small muted' }, d))))),
     el('div', { class: 'card' }, el('h3', {}, '💡 How to study for this exam'), el('ul', { class: 'tips' }, info.tips.map((t) => el('li', {}, t)), el('li', {}, 'Use Review daily (spaced repetition) and a unit test after each unit; switch to full practice exams in the last 4–6 weeks.'))),
     el(
       'div',
@@ -538,7 +662,7 @@ function openAddMaterial(app, course, unit, files = null) {
                 onclick: async () => {
                   const set = unitSet(app, course, st.unit ?? 0);
                   for (const d of r.docs) await saveDoc(app, d, set);
-                  set.questions = [...(set.questions || []), ...r.questions.map((q) => ({ id: uid(), stem: q.stem, choices: q.choices, answer: q.answer, source: r.docs[0]?.name || 'pasted' }))];
+                  set.questions = [...(set.questions || []), ...r.questions.map((q) => ({ id: uid(), stem: q.stem, choices: q.choices, answer: q.answer, explain: q.explain || '', source: r.docs[0]?.name || 'pasted' }))];
                   // Answered questions also become flashcards (question → correct answer).
                   const qa = r.questions.filter((q) => q.answer !== null).map((q) => ({ term: q.stem, def: q.choices[q.answer], kind: 'qa' }));
                   const n = addCardsToSet(set, [...qa, ...r.cards]);
@@ -722,12 +846,16 @@ function allocate(total, weights) {
   return out;
 }
 
-const grp = (c) => (c.kind === 'cloze' ? 'cloze' : c.kind === 'qa' ? 'qa' : 'def');
+// Distractors come from the same kind of card AND a similar answer length, so the right answer
+// can't be spotted just because it's the only long (or short) option.
+const grp = (c) => `${c.kind === 'cloze' ? 'cloze' : c.kind === 'qa' ? 'qa' : 'def'}:${c.def.length > 90 ? 'long' : 'short'}`;
 
 function cardQuestion(card, unitCards, courseCards) {
   const same = shuffle(unitCards.filter((c) => c.id !== card.id && grp(c) === grp(card)));
   const others = shuffle(courseCards.filter((c) => c.id !== card.id && grp(c) === grp(card) && !same.includes(c)));
-  const pool = [...same, ...others];
+  const kindOnly = (c) => grp(c).split(':')[0] === grp(card).split(':')[0];
+  const fallback = shuffle(courseCards.filter((c) => c.id !== card.id && kindOnly(c) && !same.includes(c) && !others.includes(c)));
+  const pool = [...same, ...others, ...fallback];
   let stem;
   let answer;
   let distract;
@@ -773,7 +901,7 @@ function buildExam(app, course, { kind, unit }) {
   unitsInScope.forEach((u, k) => {
     const set = sets[u];
     if (!set || !per[k]) return;
-    const bank = shuffle((set.questions || []).filter((q) => q.answer !== null)).map((q) => ({ stem: q.stem, choices: q.choices, answer: q.answer, bank: true }));
+    const bank = shuffle((set.questions || []).filter((q) => q.answer !== null)).map((q) => ({ stem: q.stem, choices: q.choices, answer: q.answer, explain: q.explain || '', bank: true }));
     // Answered bank questions also exist as flashcards — don't ask the same thing twice.
     const bankStems = new Set(bank.map((q) => q.stem.toLowerCase()));
     const made = shuffle(set.cards.filter((c) => !bankStems.has(c.term.toLowerCase())))
@@ -797,10 +925,10 @@ function buildExam(app, course, { kind, unit }) {
       for (let i = 0; i < count; i++) {
         if (bankPool.length) {
           const f = bankPool.shift();
-          items.push({ prompt: f.prompt, model: f.rubric || '', unit: f.unit, response: '', max: 4, pts: null });
+          items.push({ prompt: f.prompt, model: f.rubric || '', unit: f.unit, response: '', max: spec.pts || 4, pts: null });
         } else if (loPool.length) {
           const { c, u } = loPool.shift();
-          items.push({ prompt: `${c.term}. Use specific evidence and course vocabulary in your answer.`, model: c.def, unit: u, response: '', max: 4, pts: null });
+          items.push({ prompt: `${c.term}. Use specific evidence and course vocabulary in your answer.`, model: c.def, unit: u, response: '', max: spec.pts || 4, pts: null });
         }
       }
       if (items.length) sections.push({ kind: 'frq', name: spec.name, note: spec.note, items, minutes: Math.max(5, Math.round((spec.minutes / spec.count) * items.length)), weight: spec.weight });
@@ -987,7 +1115,7 @@ function renderSelfScore(app, s, course, info) {
   return el(
     'div',
     { class: 'study-body wide' },
-    el('div', { class: 'card' }, el('h3', {}, '✍️ Score your free responses'), el('p', { class: 'small muted', style: { margin: 0 } }, 'Compare your answer with the model answer or rubric and award yourself points honestly (0–4). AP readers reward specific, accurate evidence and answering exactly what each task verb asks.')),
+    el('div', { class: 'card' }, el('h3', {}, '✍️ Score your free responses'), el('p', { class: 'small muted', style: { margin: 0 } }, 'Compare your answer with the model answer or rubric and award yourself points honestly on the real rubric scale. AP readers reward specific, accurate evidence and answering exactly what each task verb asks.')),
     frqs.map(({ it, sec }, i) =>
       el(
         'div',
@@ -995,7 +1123,7 @@ function renderSelfScore(app, s, course, info) {
         el('div', { class: 'row small muted' }, el('span', {}, `${sec.name} ${i + 1}`), it.unit !== null && it.unit !== undefined ? el('span', { class: 'chip' }, unitLabel(info, it.unit)) : null),
         el('div', { class: 'frq-prompt' }, it.prompt),
         el('div', { class: 'grid-2' }, el('div', {}, el('div', { class: 'section-h' }, 'Your answer'), el('div', { class: 'frq-box' }, it.response || '(blank)')), el('div', {}, el('div', { class: 'section-h' }, it.model ? 'Model answer / rubric' : 'Model answer'), el('div', { class: 'frq-box model' }, it.model || 'No rubric saved for this prompt — check the scoring guideline from the College Board “Past FRQs” page.'))),
-        el('div', { class: 'row' }, el('span', { class: 'small muted' }, 'Points:'), [0, 1, 2, 3, 4].map((p) => el('button', { class: `btn sm${it.pts === p ? ' primary' : ''}`, onclick: () => ((it.pts = p), app.render()) }, String(p))), el('span', { class: 'small faint' }, `/ ${it.max}`)),
+        el('div', { class: 'row' }, el('span', { class: 'small muted' }, 'Points:'), Array.from({ length: it.max + 1 }, (_, p) => p).map((p) => el('button', { class: `btn sm${it.pts === p ? ' primary' : ''}`, onclick: () => ((it.pts = p), app.render()) }, String(p))), el('span', { class: 'small faint' }, `/ ${it.max}`)),
       ),
     ),
     el('div', { class: 'row' }, el('span', { class: 'spacer' }), el('button', { class: 'btn primary big-btn', disabled: !all, onclick: () => ((s.phase = 'results'), finalize(app, s), app.render(), window.scrollTo(0, 0)) }, all ? 'See my results' : 'Score every response to continue')),
@@ -1043,6 +1171,30 @@ function finalize(app, s) {
   setTimeout(() => confetti(window.innerWidth / 2, window.innerHeight / 3, 40), 60);
 }
 
+const missed = (s) => s.sections.filter((x) => x.kind === 'mcq').flatMap((x) => x.items).filter((it) => it.given !== it.answer);
+
+// Missed questions become starred cards in a per-course "Mistakes" set, then straight into Learn.
+function studyMistakes(app, course, s) {
+  const info = infoOf(course);
+  let set = app.data.sets.find((x) => x.courseId === course.id && x.mistakes);
+  if (!set) {
+    set = { id: uid(), title: `${info.name} · Mistakes`, classId: course.classId, courseId: course.id, mistakes: true, description: 'Questions you missed on unit tests and practice exams.', createdAt: new Date().toISOString(), lastStudied: null, cards: [], questions: [], docIds: [], keyPoints: [], topics: [], bestMatchMs: null, tests: [] };
+    app.data.sets.push(set);
+  }
+  const have = new Set(set.cards.map((c) => c.term));
+  for (const it of missed(s)) {
+    if (have.has(it.stem)) continue;
+    const card = newCard(it.stem, it.choices[it.answer] + (it.explain ? ` — ${it.explain}` : ''), 'qa');
+    card.star = true;
+    set.cards.push(card);
+    have.add(it.stem);
+  }
+  app.viewState.study = null;
+  app.commit({ render: false });
+  if (set.cards.length >= 2) startStudy(app, set.id, 'learn');
+  else app.go('set', { id: set.id });
+}
+
 function renderResults(app, s, course, info) {
   const r = s.result;
   s.keys = {};
@@ -1059,7 +1211,12 @@ function renderResults(app, s, course, info) {
       r.apScore ? el('div', { class: 'ap-score' }, el('span', {}, 'Estimated AP score'), el('b', { class: 'grad-text' }, String(r.apScore))) : el('div', { class: 'summary-big grad-text' }, `${Math.round(r.pct)}%`),
       el('div', { class: 'muted' }, `Multiple choice ${r.right}/${r.total}${r.max ? ` · Free response ${r.pts}/${r.max}` : ''} · composite ${Math.round(r.pct)}%`),
       r.apScore && el('div', { class: 'small faint', style: { marginTop: '6px' } }, 'Estimate only — real cut scores differ by subject and year.'),
-      el('div', { class: 'row wrap', style: { justifyContent: 'center', marginTop: '16px' } }, el('button', { class: 'btn primary', onclick: () => ((app.viewState.study = null), app.go('course', { id: course.id, tab: s.kind === 'unit' ? 'units' : 'exam' })) }, 'Back to course')),
+      el(
+        'div',
+        { class: 'row wrap', style: { justifyContent: 'center', marginTop: '16px' } },
+        missed(s).length > 0 && el('button', { class: 'btn primary', onclick: () => studyMistakes(app, course, s) }, `📌 Study my ${missed(s).length} mistake${missed(s).length > 1 ? 's' : ''}`),
+        el('button', { class: `btn${missed(s).length ? '' : ' primary'}`, onclick: () => ((app.viewState.study = null), app.go('course', { id: course.id, tab: s.kind === 'unit' ? 'units' : 'exam' })) }, 'Back to course'),
+      ),
     ),
     weak.length > 0 &&
       el(
@@ -1074,7 +1231,7 @@ function renderResults(app, s, course, info) {
             el('span', { style: { flex: 1 } }, info.units[w.u].title),
             el('div', { class: 'weight-bar' }, el('div', { style: { width: `${w.pct}%`, background: w.pct >= 70 ? 'var(--good)' : w.pct >= 50 ? 'var(--warn)' : 'var(--bad)' } })),
             el('span', { style: { width: '70px', textAlign: 'right' } }, `${w.right}/${w.total}`),
-            el('button', { class: 'btn sm', onclick: () => ((app.viewState.study = null), startStudy(app, course.unitSets[w.u], 'learn')) }, 'Practise'),
+            el('button', { class: 'btn sm', disabled: (unitSet(app, course, w.u)?.cards.length || 0) < 2, onclick: () => ((app.viewState.study = null), startStudy(app, course.unitSets[w.u], 'learn')) }, 'Practise'),
           ),
         ),
       ),
@@ -1089,6 +1246,7 @@ function renderResults(app, s, course, info) {
           el('div', { class: 'row small muted' }, el('span', {}, `${i + 1}. ${unitLabel(info, it.unit)}`), el('span', { class: 'spacer' }), el('b', { style: { color: it.given === it.answer ? 'var(--good)' : 'var(--bad)' } }, it.given === it.answer ? '✓' : it.given === null ? 'blank' : '✗')),
           el('div', { class: 'q-text small-q' }, it.stem),
           el('div', { class: 'choices one-col' }, it.choices.map((ch, j) => el('div', { class: `choice${j === it.answer ? ' right' : ''}${it.given === j && j !== it.answer ? ' wrong' : ''}` }, el('span', { class: 'key' }, 'ABCDE'[j]), ch))),
+          it.explain && el('div', { class: 'explain' }, el('b', {}, 'Why: '), it.explain),
         ),
       ),
     ),

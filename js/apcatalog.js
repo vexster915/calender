@@ -5,14 +5,15 @@
 // own material (uploaded CEDs, class notes, AP Classroom printouts).
 
 const mcq = (count, minutes, weight, note) => ({ kind: 'mcq', name: 'Multiple choice', count, minutes, weight, note });
-const frq = (count, minutes, weight, note, name = 'Free response') => ({ kind: 'frq', name, count, minutes, weight, note });
+// pts = points each response is scored out of on the real rubric (default 4 when rubrics vary per question).
+const frq = (count, minutes, weight, note, name = 'Free response', pts = 4) => ({ kind: 'frq', name, count, minutes, weight, note, pts });
 const U = (title, weight) => ({ title, weight });
 
 const HISTORY_EXAM = [
   mcq(55, 55, 40, 'Stimulus-based sets (sources, images, maps, data)'),
-  frq(3, 40, 20, 'Questions 1–2 required, then choose 3 or 4', 'Short answer (SAQ)'),
-  frq(1, 60, 25, 'Document-based question (includes reading time)', 'Document-based (DBQ)'),
-  frq(1, 40, 15, 'Long essay (choose 1 of 3)', 'Long essay (LEQ)'),
+  frq(3, 40, 20, 'Questions 1–2 required, then choose 3 or 4', 'Short answer (SAQ)', 3),
+  frq(1, 60, 25, 'Document-based question (includes reading time) — 7-point rubric', 'Document-based (DBQ)', 7),
+  frq(1, 40, 15, 'Long essay (choose 1 of 3) — 6-point rubric', 'Long essay (LEQ)', 6),
 ];
 
 export const AP_COURSES = [
@@ -150,7 +151,7 @@ export const AP_COURSES = [
   {
     key: 'psych', name: 'AP Psychology', slug: 'ap-psychology', area: 'History & Social Science', color: '#ff6b8b',
     units: [U('Biological Bases of Behavior', '15–25%'), U('Cognition', '15–25%'), U('Development and Learning', '15–25%'), U('Social Psychology and Personality', '15–25%'), U('Mental and Physical Health', '15–25%')],
-    exam: [mcq(75, 90, 66.7, 'Concept application 65% · research methods 25% · data interpretation 10%'), frq(2, 70, 33.3, 'Article analysis (AAQ) + evidence-based question (EBQ)')],
+    exam: [mcq(75, 90, 66.7, 'Concept application 65% · research methods 25% · data interpretation 10%'), frq(2, 70, 33.3, 'Article analysis (AAQ) + evidence-based question (EBQ), 7 points each', 'Free response', 7)],
     tips: ['Redesigned in 2024-25: fewer vocab drills, more applying concepts to scenarios.', 'Know research design vocabulary: IV/DV, operational definitions, sampling, ethics.'],
     openstax: 'psychology-2e',
   },
@@ -173,7 +174,7 @@ export const AP_COURSES = [
     key: 'lang', name: 'AP English Language and Composition', slug: 'ap-english-language-and-composition', area: 'English', color: '#8b6cff',
     units: [U('Rhetorical situation', 'skills'), U('Claims and evidence', 'skills'), U('Reasoning and organization', 'skills'), U('Style', 'skills')],
     unitWord: 'Skill',
-    exam: [mcq(45, 60, 45, 'Reading and writing (revision) questions'), frq(3, 135, 55, 'Synthesis, rhetorical analysis, argument (includes 15 min reading)')],
+    exam: [mcq(45, 60, 45, 'Reading and writing (revision) questions'), frq(3, 135, 55, 'Synthesis, rhetorical analysis, argument (includes 15 min reading) — 6-point rubric each', 'Essays', 6)],
     tips: ['The course is skill-based rather than content units — the CED’s 9 units spiral these four skill areas.', 'Rhetorical analysis: explain HOW choices build the argument, not just WHAT they are.'],
     openstax: 'writing-guide',
   },
@@ -181,10 +182,24 @@ export const AP_COURSES = [
     key: 'lit', name: 'AP English Literature and Composition', slug: 'ap-english-literature-and-composition', area: 'English', color: '#ff6b8b',
     units: [U('Short Fiction', 'skills'), U('Poetry', 'skills'), U('Longer Fiction or Drama', 'skills')],
     unitWord: 'Genre',
-    exam: [mcq(55, 60, 45, 'Passages of prose and poetry'), frq(3, 120, 55, 'Poetry analysis, prose analysis, literary argument')],
+    exam: [mcq(55, 60, 45, 'Passages of prose and poetry'), frq(3, 120, 55, 'Poetry analysis, prose analysis, literary argument — 6-point rubric each', 'Essays', 6)],
     tips: ['The CED cycles Short Fiction → Poetry → Longer Fiction/Drama three times (9 units).', 'Build a “go-to” list of 3–4 novels/plays you know deeply for the literary argument essay.'],
     openstax: 'writing-guide',
   },
+];
+
+// Task verbs used in AP free-response questions and what each one requires.
+export const TASK_VERBS = [
+  ['Identify', 'Name or point out the answer — no explanation needed.'],
+  ['Describe', 'Give the relevant characteristics of something (what it is / what happens).'],
+  ['Explain', 'Give the how or why — connect cause to effect with reasoning.'],
+  ['Justify', 'Give evidence or reasoning that supports a claim or answer.'],
+  ['Predict / Make a claim', 'State an expected outcome; usually followed by a justification.'],
+  ['Calculate', 'Show the steps and the setup, with units, to reach a numerical answer.'],
+  ['Compare', 'Give similarities AND/OR differences between two things, explicitly.'],
+  ['Evaluate', 'Judge the significance or validity of something using evidence.'],
+  ['Support / Refute / Qualify', 'Take a position on a claim and back it with specific evidence.'],
+  ['Represent / Draw / Sketch', 'Produce a diagram, graph or model with correct labels.'],
 ];
 
 export const courseByKey = (key) => AP_COURSES.find((c) => c.key === key);

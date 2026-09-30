@@ -239,6 +239,7 @@ function renderAuth(tab = vault.listAccounts().length ? 'login' : 'signup', noti
       el('label', { class: 'field' }, el('span', {}, 'Confirm password'), pass2),
       errorEl,
       btn,
+      el('div', { class: 'row small' }, el('span', { class: 'muted' }, 'Moving from another device?'), el('a', { href: '#', onclick: (e) => (e.preventDefault(), renderAuth('import')) }, 'Restore a backup')),
     );
     setTimeout(() => user.focus(), 20);
   } else if (tab === 'recover') {
@@ -305,7 +306,7 @@ function renderAuth(tab = vault.listAccounts().length ? 'login' : 'signup', noti
       el('label', { class: 'field' }, el('span', {}, 'Password'), pass),
       errorEl,
       btn,
-      el('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), renderAuth('login')) }, '← Back to log in'),
+      el('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), renderAuth()) }, '← Back'),
     );
   }
 
@@ -594,6 +595,9 @@ setInterval(() => {
   if (!app.session) return;
   const mins = app.data?.settings?.autoLockMin;
   if (!mins || app.focus.running) return;
+  // Never lock in the middle of a practice exam — you may be reading a long passage.
+  const exam = app.viewState.study?.session;
+  if (exam?.mode === 'exam' && exam.phase !== 'results') return;
   if (Date.now() - app.lastActivity > mins * 60000) app.lock('Locked after inactivity');
 }, 10000);
 

@@ -28,6 +28,12 @@ Pick your AP classes from the built-in catalog of **23 AP courses**. Each comes 
 - **Practice AP exams.** Full-length, half-length, or multiple-choice only, with the real exam's sections and timing. MCQs are spread across units by their official weighting. There's a Bluebook-style question navigator and mark-for-review, and sections auto-submit when time runs out. You self-score FRQs against the rubric. Results show an **estimated 1–5 score** and a per-unit breakdown pointing to your weakest units.
 - **FRQ bank.** Paste released free-response questions (free on each course's "Past FRQs" page) with their scoring guidelines. If there are none, CED learning objectives are used as prompts.
 - **AP exam date.** Add it to the Planner, and the exam boost kicks in for that course's cards in the final week.
+- **Study plan to exam day.** One click fills your Planner with unit reviews, weighted by exam weight and how much you've mastered, then switches to weekly full practice exams for the final stretch.
+- **Focus next.** Recommends the units most worth your time: exam weight × unmastered cards × recent unit-test scores.
+- **Study my mistakes.** After any test, missed questions go into a starred "Mistakes" deck, along with the answer explanation when the source had one.
+- **Real rubric scales** for free response: SAQ out of 3, DBQ out of 7, LEQ out of 6, AP Psych AAQ/EBQ out of 7, English essays out of 6.
+- **Score trend** chart across unit tests and practice exams, plus an **FRQ task-verb guide** (identify vs. describe vs. explain vs. justify…).
+- Exams you leave midway can be resumed, and auto-lock never interrupts an exam in progress.
 
 **Regular classes:** your own PDFs come first. If you have none, the AP & Courses page suggests free, openly-licensed material for each class, such as an OpenStax textbook (downloadable PDF) and Khan Academy, which you can upload to make a study set.
 
