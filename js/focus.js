@@ -3,7 +3,7 @@
 //  • Time blindness → visible elapsed time / countdowns and gentle break check-ins.
 //  • Working memory is precious → a parking lot for stray thoughts, small chunks, read-aloud.
 //  • Immediate, effort-based rewards → XP for showing up, levels, and forgiving streaks (freezes), never punishment.
-import { el, uid, dayKey, addDays, startOfDay } from './util.js';
+import { el, uid, dayKey, addDays, startOfDay, kbd } from './util.js';
 import { modal, toast } from './ui.js';
 import { reviewQueue, dueCount, examsSoon, setsForItem, isNew } from './srs.js';
 import { parseQuickAdd } from './parse.js';
@@ -164,7 +164,7 @@ export function openParkingLot(app) {
         { class: 'stack' },
         el('p', { class: 'small muted', style: { margin: 0 } }, 'Get it out of your head so it stops tugging at you. It waits on your Home page.'),
         input,
-        el('div', { class: 'row' }, el('span', { class: 'spacer' }), el('button', { class: 'btn primary', onclick: save }, 'Park it (Enter)')),
+        el('div', { class: 'row' }, el('span', { class: 'spacer' }), el('button', { class: 'btn primary', onclick: save }, `Park it${kbd(' (Enter)')}`)),
       );
     },
     { center: true },

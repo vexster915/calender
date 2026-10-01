@@ -1,6 +1,6 @@
 // Orbit Study — study sets, card generation from PDFs/notes, and the study modes:
 //   Flashcards · Learn ("Orbit" adaptive mode) · Test · Match · Daily Review (spaced repetition)
-import { el, add, uid, fmtDate, relDay, relDue, fmtMinutes, dayKey, addDays, startOfDay, WEEKDAYS, clamp, fmtTime, sameDay, tone } from './util.js';
+import { el, add, uid, TOUCH, kbd, fmtDate, relDay, relDue, fmtMinutes, dayKey, addDays, startOfDay, WEEKDAYS, clamp, fmtTime, sameDay, tone } from './util.js';
 import { modal, confirmBox, toast, confetti, svg } from './ui.js';
 import { generateCards, parseImport, checkAnswer } from './gen.js';
 import { ORBITS, newCard, grade, previewInterval, isNew, mastery, examsSoon, setsForItem, reviewQueue, dueCount, logStudy, studiedToday, shuffle } from './srs.js';
@@ -72,6 +72,26 @@ export function quickGame(app) {
   if (!sets.length) return toast('Make a study set with at least 4 cards to unlock games 🎮');
   const pick = sets[Math.floor(Math.random() * Math.min(3, sets.length))];
   startStudy(app, pick.id, Math.random() < 0.5 ? 'blitz' : 'boss');
+}
+
+// iPhone/iPad in Safari: suggest Add to Home Screen. Home-screen web apps open full-screen,
+// and Safari may clear a website's storage after ~7 days without a visit; installed apps are spared.
+function iosHint(app) {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (!ios || standalone || app.data.settings.iosHintDismissed) return null;
+  return el(
+    'div',
+    { class: 'card ios-hint', role: 'note' },
+    el('div', { class: 'big' }, '📲'),
+    el(
+      'div',
+      { style: { flex: 1 } },
+      el('b', {}, 'Add Orbit to your Home Screen'),
+      el('div', { class: 'small muted' }, 'Tap the Share button (the square with an arrow ⬆️), then “Add to Home Screen”. Orbit opens full-screen like an app, and your iPhone keeps its data safe. Safari can clear website data after a week without visits, so exporting a backup in Settings now and then is smart too.'),
+    ),
+    el('button', { class: 'btn sm', onclick: () => ((app.data.settings.iosHintDismissed = true), app.commit()) }, 'Got it'),
+  );
 }
 
 // ------------------------------------------------------------------ Home (study-first dashboard)
@@ -189,7 +209,7 @@ export function renderHome(app) {
     'div',
     { class: 'card create-drop' },
     el('div', { class: 'big' }, '📄'),
-    el('div', { style: { fontWeight: 700 } }, 'Drop class notes or a PDF here'),
+    el('div', { style: { fontWeight: 700 } }, TOUCH ? 'Turn class notes or a PDF into cards' : 'Drop class notes or a PDF here'),
     el('div', { class: 'small muted' }, 'Orbit turns it into flashcards, a quiz and key points — right in your browser.'),
     el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '10px' } }, el('button', { class: 'btn primary', onclick: () => input.click() }, 'Upload PDF'), el('button', { class: 'btn', onclick: () => openCreateSet(app, { tab: 'paste' }) }, 'Paste notes')),
     input,
@@ -197,7 +217,7 @@ export function renderHome(app) {
   wireFileDrop(drop, (files) => openCreateSet(app, { files }));
 
   if (!data.sets.length && !data.classes.length && !data.items.length) {
-    return el('div', {}, hero, welcome(app, drop));
+    return el('div', {}, iosHint(app), hero, welcome(app, drop));
   }
   // ONE suggested next step, so you don't have to decide (decisions drain focus).
   const next = nextAction(app, { startStudy, openItemEditor, openCreateSet });
@@ -213,7 +233,7 @@ export function renderHome(app) {
       el('div', { class: 'row', style: { gap: '6px' } }, el('button', { class: 'btn sm', title: 'Blitz or Boss battle on the set that needs it most (G)', onclick: () => quickGame(app) }, '🎮 Quick game'), el('button', { class: 'btn sm', title: 'Short review sprint with a visible timer (J)', onclick: () => startSprint(app, startStudy) }, `⚡ Just ${data.settings.sprintMin || 5} min`), el('button', { class: 'btn sm', title: 'Park a distracting thought (P)', onclick: () => openParkingLot(app) }, '🅿️ Park a thought')),
     ),
   );
-  return el('div', {}, hero, nextCard, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, questCard(app), parkingCard(app), drop, todayCard), setsCard));
+  return el('div', {}, iosHint(app), hero, nextCard, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, questCard(app), parkingCard(app), drop, todayCard), setsCard));
 }
 
 function welcome(app, drop) {
@@ -492,7 +512,7 @@ function cardList(app, set, st) {
       ),
     ),
     list,
-    el('div', { class: 'card add-card', style: { marginTop: '12px' } }, el('div', { class: 'section-h', style: { marginBottom: '8px' } }, 'Add a card'), el('div', { class: 'card-cols' }, nt, nd), el('div', { class: 'row', style: { marginTop: '8px' } }, el('span', { class: 'small faint' }, 'Tip: put _____ in the term to make a fill-in-the-blank card. Ctrl+Enter adds.'), el('span', { class: 'spacer' }), el('button', { class: 'btn sm primary', onclick: addCard }, '+ Add card'))),
+    el('div', { class: 'card add-card', style: { marginTop: '12px' } }, el('div', { class: 'section-h', style: { marginBottom: '8px' } }, 'Add a card'), el('div', { class: 'card-cols' }, nt, nd), el('div', { class: 'row', style: { marginTop: '8px' } }, el('span', { class: 'small faint' }, `Tip: put _____ in the term to make a fill-in-the-blank card.${kbd(' Ctrl+Enter adds.')}`), el('span', { class: 'spacer' }), el('button', { class: 'btn sm primary', onclick: addCard }, '+ Add card'))),
   );
 }
 
@@ -657,7 +677,7 @@ function createStep1(app, st, m, addToSet) {
       'div',
       { class: 'pdf-drop' },
       el('div', { class: 'big' }, '📄'),
-      el('div', {}, el('button', { class: 'btn primary', onclick: () => input.click() }, 'Choose PDFs'), ' or drop them here'),
+      el('div', {}, el('button', { class: 'btn primary', onclick: () => input.click() }, 'Choose PDFs'), kbd(' or drop them here')),
       el('div', { class: 'small muted' }, 'Class notes, study guides, slides exported to PDF, worksheets. Works with PDFs whose text you can select (not scanned photos).'),
       input,
     );
@@ -780,15 +800,15 @@ function createStep2(app, st, m, addToSet) {
   const chosen = r.cards.filter((c) => c.include).length;
   const kinds = { def: 'Definition', qa: 'Q & A', cloze: 'Fill-in', manual: 'Imported' };
   const rows = r.cards.map((c) => {
-    const cb = el('input', { type: 'checkbox', class: 'check sq', checked: c.include });
+    const cb = el('input', { type: 'checkbox', class: 'check sq', checked: c.include, 'aria-label': 'Include this card' });
     cb.addEventListener('change', () => {
       c.include = cb.checked;
       m.body.querySelector('.create-count').textContent = `Create with ${r.cards.filter((x) => x.include).length} cards`;
       row.classList.toggle('off', !c.include);
     });
-    const term = el('textarea', { rows: 2 }, c.term);
+    const term = el('textarea', { rows: 2, 'aria-label': 'Term' }, c.term);
     term.addEventListener('input', () => (c.term = term.value));
-    const def = el('textarea', { rows: 2 }, c.def);
+    const def = el('textarea', { rows: 2, 'aria-label': 'Definition' }, c.def);
     def.addEventListener('input', () => (c.def = def.value));
     const row = el('div', { class: `gen-row${c.include ? '' : ' off'}` }, cb, el('div', { class: 'card-cols' }, term, def), el('span', { class: 'chip' }, kinds[c.kind] || c.kind));
     return row;
@@ -982,6 +1002,25 @@ function renderFlashcards(app, s, set, top) {
     if (s.i >= cards.length) finishSession(app, s);
     app.commit();
   };
+  // Swipe right = know it, swipe left = still learning (phones).
+  let sx = null;
+  let sy = null;
+  flip.addEventListener('touchstart', (e) => ([sx, sy] = [e.touches[0].clientX, e.touches[0].clientY]), { passive: true });
+  flip.addEventListener('touchmove', (e) => {
+    if (sx == null) return;
+    const dx = e.touches[0].clientX - sx;
+    if (Math.abs(dx) > Math.abs(e.touches[0].clientY - sy)) flip.style.transform = `translateX(${dx * 0.6}px) rotate(${dx / 30}deg)`;
+  }, { passive: true });
+  flip.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    sx = null;
+    flip.style.transform = '';
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      e.preventDefault(); // don't also flip
+      mark(dx > 0);
+    }
+  });
   s.keys = { ' ': () => flip.click(), ArrowUp: () => flip.click(), ArrowDown: () => flip.click(), ArrowLeft: () => mark(false), ArrowRight: () => mark(true), 1: () => mark(false), 2: () => mark(true), r: () => speak(s.flipped ? p.a : p.q) };
   return el(
     'div',
@@ -995,7 +1034,7 @@ function renderFlashcards(app, s, set, top) {
       el('button', { class: 'btn icon ghost', title: card.star ? 'Unstar' : 'Star', onclick: () => ((card.star = !card.star), app.commit()) }, card.star ? '★' : '☆'),
       el('button', { class: 'btn big-btn know', onclick: () => mark(true) }, 'Know it ✓'),
     ),
-    el('div', { class: 'small faint', style: { textAlign: 'center' } }, 'Space to flip · ← still learning · → know it'),
+    el('div', { class: 'small faint', style: { textAlign: 'center' } }, TOUCH ? 'Tap the card to flip · swipe ← still learning · swipe → know it' : 'Space to flip · ← still learning · → know it'),
   );
 }
 
@@ -1382,7 +1421,7 @@ function renderReview(app, s, top) {
             [3, 'Easy', 'easy'],
           ].map(([q, l, c]) => el('button', { class: `rate ${c}`, onclick: () => rate(q) }, el('b', {}, l), el('span', {}, previewInterval(card, q)), el('kbd', {}, String(q + 1)))),
         )
-      : el('div', { class: 'row', style: { justifyContent: 'center' } }, el('button', { class: 'btn primary big-btn', onclick: show }, 'Show answer (space)')),
+      : el('div', { class: 'row', style: { justifyContent: 'center' } }, el('button', { class: 'btn primary big-btn', onclick: show }, `Show answer${kbd(' (space)')}`)),
     el('div', { class: 'small faint', style: { textAlign: 'center' } }, 'Be honest — Orbit uses your rating to decide when you see this card again.'),
   );
 }

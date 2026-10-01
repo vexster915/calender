@@ -1,9 +1,9 @@
 // Orbit — app shell: authentication screens, navigation, saving, auto-lock, quick add.
-import { el, add, clear, uid, fmtDate, fmtTime, debounce, paint } from './util.js';
+import { el, add, clear, uid, fmtDate, fmtTime, debounce, paint, TOUCH } from './util.js';
 import * as vault from './vault.js';
 import { emptyData, autoPlan, TYPE_META, logActivity } from './logic.js';
 import { parseQuickAdd } from './parse.js';
-import { closeModal, modalOpen, toast, logo, confetti } from './ui.js';
+import { closeModal, modalOpen, modal, toast, logo, confetti } from './ui.js';
 import { forgetImages, uploadFiles } from './attach.js';
 import { VIEWS, NAV_ORDER, NAV_GROUPS, PLANNER_TABS, openItemEditor, openHelp } from './views.js';
 import { studyKey, startStudy, quickGame } from './study.js';
@@ -459,7 +459,7 @@ function renderShell() {
   const sidebar = el(
     'aside',
     { class: 'sidebar' },
-    el('div', { class: 'brand' }, logo(), el('h1', { class: 'grad-text' }, 'Orbit')),
+    el('div', { class: 'brand' }, logo(), el('div', { class: 'brand-name grad-text' }, 'Orbit')),
     NAV_GROUPS.map(([label, ids]) => [el('div', { class: 'nav-group' }, label), ids.map(navBtn)]),
     el(
       'div',
@@ -474,19 +474,38 @@ function renderShell() {
   if (!modalOpen()) app.pasteTarget = null;
   // The calendar quick-add bar only shows on planner screens; study screens stay uncluttered.
   const showQuick = ['planner', 'classes'].includes(app.view);
-  const main = el('main', { class: `main${app.view === 'study' ? ' focus-mode' : ''}` }, showQuick && quickAddBar(keepQuick), VIEWS[app.view].render(app));
+  const main = el('main', { class: `main${app.view === 'study' ? ' focus-mode' : ''}` }, showQuick && quickAddBar(keepQuick), app.view !== 'study' && el('h1', { class: 'sr-only' }, `Orbit — ${VIEWS[app.view].label}`), VIEWS[app.view].render(app));
 
+  // Phone tab bar: the four main tabs + "More" for everything else.
+  const tabs = NAV_ORDER.filter((id) => VIEWS[id].mobile);
+  const rest = NAV_ORDER.filter((id) => !VIEWS[id].mobile);
+  const moreOn = rest.some(isOn);
   const mobileNav = el(
     'nav',
-    { class: 'mobile-nav' },
-    NAV_ORDER.filter((id) => VIEWS[id].mobile).map((id) =>
-      el('button', { class: isOn(id) ? 'on' : '', onclick: () => app.go(id) }, el('span', { class: 'ico' }, VIEWS[id].icon), VIEWS[id].short || VIEWS[id].label),
-    ),
+    { class: 'mobile-nav', 'aria-label': 'Main' },
+    tabs.map((id) => {
+      const badge = VIEWS[id].badge?.(app);
+      return el('button', { class: isOn(id) ? 'on' : '', 'aria-current': isOn(id) ? 'page' : null, onclick: () => app.go(id) }, el('span', { class: 'ico' }, VIEWS[id].icon, badge ? el('span', { class: 'tab-badge' }, String(badge)) : null), VIEWS[id].short || VIEWS[id].label);
+    }),
+    el('button', { class: moreOn ? 'on' : '', 'aria-haspopup': 'dialog', onclick: () => openMoreSheet(rest, isOn) }, el('span', { class: 'ico' }, '☰'), 'More'),
   );
 
   // Focus mode: while studying, hide everything except the work.
   const focus = app.view === 'study' && app.data.settings.focusMode;
   root.appendChild(el('div', { class: `shell${focus ? ' focus' : ''}` }, sidebar, main, mobileNav));
+}
+
+function openMoreSheet(ids, isOn) {
+  modal(
+    'More',
+    (m) =>
+      el(
+        'div',
+        { class: 'more-sheet' },
+        ids.map((id) => el('button', { class: `more-item${isOn(id) ? ' on' : ''}`, onclick: () => (m.close(), app.go(id)) }, el('span', { class: 'ico' }, VIEWS[id].icon), VIEWS[id].label)),
+        el('div', { class: 'more-foot' }, el('span', { class: 'muted small' }, `@${app.session.username} · encrypted on this device`), el('button', { class: 'btn', onclick: () => (m.close(), app.lock()) }, '🔒 Lock')),
+      ),
+  );
 }
 
 function quickAddBar(keep) {
@@ -514,7 +533,7 @@ function quickAddBar(keep) {
       p.due ? el('span', { class: 'chip steady' }, `📅 ${fmtDate(p.due)}${p.hasTime ? ' · ' + fmtTime(p.due) : ''}`) : el('span', { class: 'chip' }, 'no date'),
       p.estimateMin && el('span', { class: 'chip' }, `⏱ ${p.estimateMin}m`),
       p.weight && el('span', { class: 'chip' }, `⚖ ${p.weight}%`),
-      el('div', { class: 'hint' }, 'Enter to add · Shift+Enter to add with details · #class  !exam  ~2h  20%'),
+      el('div', { class: 'hint' }, TOUCH ? 'Tap return to add · #class  !exam  ~2h  20%' : 'Enter to add · Shift+Enter to add with details · #class  !exam  ~2h  20%'),
     );
   };
 

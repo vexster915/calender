@@ -1,5 +1,5 @@
 // All the screens inside Orbit, plus the item and class editors.
-import { el, add, clear, uid, addDays, startOfDay, sameDay, dayKey, fromDayKey, fmtTime, fmtDate, relDay, relDue, fmtMinutes, toLocalInput, WEEKDAYS, WEEKDAYS_LONG, MONTHS_LONG, clamp, paint, tone } from './util.js';
+import { el, add, clear, uid, addDays, startOfDay, sameDay, dayKey, fromDayKey, fmtTime, fmtDate, relDay, relDue, fmtMinutes, toLocalInput, WEEKDAYS, WEEKDAYS_LONG, MONTHS_LONG, clamp, paint, tone, kbd } from './util.js';
 import {
   TYPE_META, CLASS_COLORS, priority, sortByPriority, autoPlan, forecast, sessionsOn, classGrade, letter, neededFor,
   streak, meetingsOn, focusMinutesOn, logActivity, remainingMin, toICS, sampleData,
@@ -919,12 +919,12 @@ export function openItemEditor(app, item, opts = {}) {
       'div',
       { class: 'subtasks' },
       draft.subtasks.map((s, idx) => {
-        const cb = el('input', { type: 'checkbox', class: 'check sq', checked: s.done });
+        const cb = el('input', { type: 'checkbox', class: 'check sq', checked: s.done, 'aria-label': `Step done: ${s.text}` });
         cb.addEventListener('change', () => {
           s.done = cb.checked;
           ctl.rebuild();
         });
-        const txt = el('input', { type: 'text', value: s.text });
+        const txt = el('input', { type: 'text', value: s.text, 'aria-label': 'Step' });
         txt.addEventListener('input', () => (s.text = txt.value));
         return el(
           'div',
@@ -967,15 +967,15 @@ export function openItemEditor(app, item, opts = {}) {
       .slice()
       .sort((a, b) => (a.day < b.day ? -1 : 1))
       .map((s) => {
-        const cb = el('input', { type: 'checkbox', class: 'check sq', checked: s.done });
+        const cb = el('input', { type: 'checkbox', class: 'check sq', checked: s.done, 'aria-label': `Study session on ${s.day} done` });
         cb.addEventListener('change', () => {
           s.done = cb.checked;
           draft.spentMin = Math.max(0, (draft.spentMin || 0) + (s.done ? s.minutes : -s.minutes));
           ctl.rebuild();
         });
-        const day = el('input', { type: 'date', value: s.day, class: 'input', style: { width: 'auto', padding: '5px 8px' } });
+        const day = el('input', { type: 'date', value: s.day, class: 'input', 'aria-label': 'Session day', style: { width: 'auto', padding: '5px 8px' } });
         day.addEventListener('change', () => day.value && (s.day = day.value));
-        const mins = el('input', { type: 'number', min: 5, step: 5, value: s.minutes, style: { width: '76px', padding: '5px 8px' } });
+        const mins = el('input', { type: 'number', min: 5, step: 5, value: s.minutes, 'aria-label': 'Session minutes', style: { width: '76px', padding: '5px 8px' } });
         mins.addEventListener('change', () => (s.minutes = Math.max(5, parseInt(mins.value, 10) || 5)));
         return el(
           'div',
@@ -1438,7 +1438,7 @@ function focusCard(app, num, card) {
   const comfort = () => applyComfort(s);
   return card(
     '🎮 Focus & games',
-    el('p', { class: 'small muted', style: { margin: 0 } }, 'Blitz, Boss battles, daily quests and loot live on every study set and on Home. Shortcuts: G = quick game, J = quick sprint, P = park a distracting thought, R = read a card aloud.'),
+    el('p', { class: 'small muted', style: { margin: 0 } }, `Blitz, Boss battles, daily quests and loot live on every study set and on Home.${kbd(' Shortcuts: G = quick game, J = quick sprint, P = park a distracting thought, R = read a card aloud.')}`),
     toggle('sfx', 'Game sounds', 'little blips for right answers, combos and boss hits'),
     toggle('focusMode', 'Focus mode while studying', 'hides the sidebar and everything except the card in front of you'),
     toggle('timeBuffer', 'Time-blindness buffer', 'auto-plans assume work takes 1.5× your estimate'),
@@ -1768,7 +1768,7 @@ export const VIEWS = {
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
   files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },
   focus: { label: 'Focus timer', icon: '⏱', render: renderFocus, mobile: false },
-  settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
+  settings: { label: 'Settings', icon: '⚙', render: renderSettings, mobile: false },
   set: { label: 'Study set', icon: '📚', render: renderSet },
   study: { label: 'Study', icon: '🪐', render: renderStudy },
 };

@@ -1,7 +1,7 @@
 // Game modes that make studying feel like playing — built for brains that crave novelty,
 // speed and instant feedback (ADHD-friendly): Blitz, Boss Battle, daily quests, combos,
 // mystery loot and little sound effects. Everything still feeds the same cards and XP.
-import { el, add, dayKey, clamp } from './util.js';
+import { el, add, dayKey, clamp, TOUCH, kbd } from './util.js';
 import { toast, confetti } from './ui.js';
 import { grade, isNew, logStudy, shuffle, dueCount } from './srs.js';
 import { checkAnswer } from './gen.js';
@@ -218,9 +218,9 @@ export function renderBlitz(app, s, set, top, finish, summary) {
         { class: 'card summary game-intro' },
         el('div', { class: 'big' }, '⚡'),
         el('h3', { style: { justifyContent: 'center' } }, 'Blitz'),
-        el('p', { class: 'muted' }, '60 seconds. Pick fast with keys 1–4. Right answers chain a combo (×2 at 3, ×3 at 6, ×4 FEVER at 10) and add +1s. Misses cost 3s.'),
+        el('p', { class: 'muted' }, `60 seconds. ${TOUCH ? 'Tap fast.' : 'Pick fast with keys 1–4.'} Right answers chain a combo (×2 at 3, ×3 at 6, ×4 FEVER at 10) and add +1s. Misses cost 3s.`),
         set.bestBlitz ? el('div', { class: 'small' }, `🏆 Your best: ${set.bestBlitz.toLocaleString()}`) : null,
-        el('button', { class: 'btn primary big-btn', style: { marginTop: '14px' }, onclick: start }, 'Start! (space)'),
+        el('button', { class: 'btn primary big-btn', style: { marginTop: '14px' }, onclick: start }, `Start!${kbd(' (space)')}`),
       ),
     );
   }

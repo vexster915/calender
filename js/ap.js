@@ -1,6 +1,6 @@
 // AP courses: official unit structure, CED import, AP Classroom material, unit tests and
 // full practice AP exams built on the real exam format.
-import { el, add, uid, fmtDate, clamp, tone } from './util.js';
+import { el, add, uid, fmtDate, clamp, tone, kbd } from './util.js';
 import { modal, confirmBox, toast, confetti } from './ui.js';
 import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor, TASK_VERBS } from './apcatalog.js';
 import { parseCED, cedCards, parseMCQ, splitFRQ, detectUnit } from './apparse.js';
@@ -732,7 +732,7 @@ function openAddMaterial(app, course, unit, files = null) {
       }
       const input = el('input', { type: 'file', accept: '.pdf,application/pdf,.txt,text/plain', multiple: true, class: 'hidden' });
       input.addEventListener('change', () => (st.files.push(...input.files), m.rebuild()));
-      const zone = el('div', { class: 'pdf-drop' }, el('div', { class: 'big' }, '📄'), el('div', {}, el('button', { class: 'btn primary', onclick: () => input.click() }, 'Choose PDFs'), ' or drop them here'), input);
+      const zone = el('div', { class: 'pdf-drop' }, el('div', { class: 'big' }, '📄'), el('div', {}, el('button', { class: 'btn primary', onclick: () => input.click() }, 'Choose PDFs'), kbd(' or drop them here')), input);
       wireFileDrop(zone, (fl) => (st.files.push(...fl), m.rebuild()));
       const ta = el('textarea', { rows: 6, placeholder: '…or paste text: progress-check questions (with “Answer: B” lines or an answer key), notes, a study guide…' }, st.paste);
       ta.addEventListener('input', () => (st.paste = ta.value));

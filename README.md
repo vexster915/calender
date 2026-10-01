@@ -49,6 +49,17 @@ Studying should feel like playing. Every set with 4+ cards has two game modes, a
 - **🎁 Mystery loot.** Finishing a session has a chance to drop a common, rare or epic XP orb. Unpredictable rewards keep it interesting.
 - **🔥 Combos and sounds** in Learn and Review, plus **🎲 Surprise me** and a **🎮 Quick game** button (`G`) when you can't decide what to do.
 
+## On iPhone
+
+Orbit works fully on iPhone (and iPad):
+
+- **Add it to your Home Screen.** In Safari, tap Share → **Add to Home Screen**. It opens full-screen like an app, with its own icon. Orbit shows this tip once on Home.
+- **Tab bar** at the bottom (Home, Library, Review, Planner) plus **More** for AP & Courses, Classes, Files, Focus timer, Settings and Lock.
+- **Touch-first study:** tap a flashcard to flip it, then swipe right for "know it" or left for "still learning". All modes, games and practice exams use big tap targets.
+- Pop-ups become bottom sheets, text boxes don't zoom the page, and layouts respect the notch and home bar.
+- Upload PDFs from Files, and photos or screenshots straight from your camera roll.
+- **Keep a backup.** Safari can clear a website's data after a week without visits. Home-screen apps are kept, but exporting an encrypted backup now and then (Settings → Your data) is the safest move.
+
 ## Focus & ADHD support
 
 Built around what ADHD study research and clinicians recommend: make starting tiny, make time visible, take load off working memory, and reward effort instead of punishing slips. Everything is optional and lives under **Settings → Focus & ADHD support**.

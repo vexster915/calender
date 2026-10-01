@@ -532,8 +532,10 @@ input[type='color'] {
 .sidebar .brand {
   padding: 0 8px 20px;
 }
-.sidebar .brand h1 {
+.sidebar .brand .brand-name {
   font-size: 1.35em;
+  font-weight: 800;
+  line-height: 1.2;
 }
 .sidebar .brand .logo {
   width: 34px;
@@ -2988,4 +2990,401 @@ html[data-calm='on'] *::after {
 }
 a.btn {
   text-decoration: none;
+}
+
+/* ======================================================================
+   iPhone / touch support
+   ====================================================================== */
+.tab-badge {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--accent-2);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+.more-sheet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.more-item .ico {
+  font-size: 1.7em;
+}
+.more-item.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+.more-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+.ios-hint {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  border-color: color-mix(in srgb, var(--accent-3) 50%, var(--line));
+}
+.ios-hint .big {
+  font-size: 1.8em;
+  line-height: 1;
+}
+
+/* Touch screens: no hover, fat fingers, and iOS zooms into inputs under 16px. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  .btn {
+    min-height: 44px;
+  }
+  .btn.sm {
+    min-height: 40px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .btn.icon {
+    min-width: 44px;
+  }
+  .seg button {
+    min-height: 40px;
+  }
+  input.check,
+  input.check.sq {
+    width: 24px;
+    height: 24px;
+  }
+  .kbd-hint,
+  .kbd,
+  .choice .key {
+    display: none !important;
+  }
+  .mode-tile:hover,
+  .pick:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+  .shell {
+    min-height: 100dvh;
+  }
+  .main {
+    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) calc(92px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+  .mobile-nav button {
+    position: relative;
+    min-height: 50px;
+    font-size: 0.7em;
+    font-weight: 600;
+  }
+  .mobile-nav button .ico {
+    position: relative;
+  }
+  /* While studying in focus mode there's an Exit button, so the tab bar can go. */
+  .shell.focus .mobile-nav {
+    display: none;
+  }
+  .shell.focus .main {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  /* Modals become bottom sheets. */
+  .modal-back,
+  .modal-back.center {
+    align-items: flex-end;
+    justify-content: stretch;
+    padding: 0;
+  }
+  .modal,
+  .modal-back.center .modal,
+  .modal.wide {
+    width: 100%;
+    height: auto;
+    max-height: 92dvh;
+    border-radius: 22px 22px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    animation: sheet-up 0.22s ease-out;
+  }
+  @keyframes sheet-up {
+    from {
+      transform: translateY(40px);
+      opacity: 0;
+    }
+  }
+  .modal-head h3 {
+    font-size: 1.1em;
+  }
+
+  /* Page headers + generic layout */
+  .page-title,
+  .set-header,
+  .hero {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .page-title h2 {
+    font-size: 1.45em;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+  .stat {
+    min-width: 0;
+    padding: 10px 12px;
+  }
+  .stat b {
+    font-size: 1.25em;
+  }
+  .card {
+    padding: 16px;
+  }
+  .topbar {
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .planner-tabs .seg,
+  .seg {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg button {
+    white-space: nowrap;
+  }
+
+  /* Home */
+  .next-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .next-card .next-icon {
+    display: none;
+  }
+  .next-card .row {
+    flex-wrap: wrap;
+  }
+  .next-card .row .btn {
+    flex: 1 1 auto;
+  }
+  .review-cta {
+    flex-wrap: wrap;
+  }
+
+  /* Study */
+  .mode-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .mode-tile {
+    padding: 12px;
+  }
+  .study-top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .study-title {
+    flex: 1 1 100%;
+    order: -1;
+    font-size: 0.95em;
+  }
+  .choices,
+  .choice-grid {
+    grid-template-columns: 1fr;
+  }
+  .choice {
+    min-height: 52px;
+    align-items: center;
+  }
+  .flip {
+    min-height: 300px;
+  }
+  .face-text {
+    font-size: 1.2em;
+  }
+  .blitz-score {
+    font-size: 2em;
+  }
+  .boss-emoji {
+    font-size: 2.8em;
+  }
+  .game-q .face-text {
+    font-size: 1.15em;
+  }
+  .summary-big {
+    font-size: 2.2em;
+  }
+  .learn-stages {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 760px) {
+  #toasts {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: calc(100% - 32px);
+    align-items: center;
+  }
+  body:has(.shell.focus) #toasts,
+  body:has(.modal-back) #toasts {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+  .topbar .lock-label {
+    display: none;
+  }
+  .topbar .quick {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .topbar {
+    justify-content: flex-end;
+  }
+  .planner-tabs .seg {
+    display: flex;
+    width: 100%;
+  }
+  .planner-tabs .seg button {
+    flex: 1;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 0.85em;
+  }
+  .set-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+  .set-header > :first-child {
+    grid-column: 1 / -1;
+  }
+  .set-header > .stack {
+    flex-direction: row;
+    align-self: center;
+  }
+  .set-header h2 {
+    font-size: 1.5em !important;
+  }
+  .set-header .ring {
+    width: 70px;
+    height: 70px;
+  }
+  .match-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .match-tile {
+    min-height: 82px;
+    padding: 8px;
+    font-size: 0.9em;
+  }
+  .btn {
+    max-width: 100%;
+  }
+  a.btn,
+  .row.wrap .btn {
+    white-space: normal;
+    text-align: center;
+  }
+  .btn.learning,
+  .btn.know {
+    flex: 1 1 0;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .flip + .row {
+    flex-wrap: nowrap;
+    gap: 8px !important;
+  }
+}
+.auth {
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+@media (pointer: coarse) {
+  .auth a {
+    display: inline-block;
+    padding: 10px 4px;
+  }
+}
+@media (max-width: 760px) {
+  .ios-hint {
+    flex-wrap: wrap;
+  }
+  .ios-hint .btn {
+    margin-left: auto;
+  }
+}
+/* iOS: no grey tap flash, no double-tap zoom delay on controls, no background scroll behind sheets. */
+button,
+a,
+.choice,
+.mode-tile,
+.match-tile,
+.flip {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+body:has(.modal-back) {
+  overflow: hidden;
+}
+.mobile-nav {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+@media (pointer: coarse) {
+  .topic-toggle {
+    min-height: 40px;
+    padding: 8px 6px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

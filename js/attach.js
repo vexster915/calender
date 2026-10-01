@@ -1,6 +1,6 @@
 // Screenshots: upload, gallery, full-screen viewer and the Files page.
 // Every image is compressed, then encrypted with your data key before it's stored.
-import { el, add, clear, uid, fmtDate, fmtTime } from './util.js';
+import { el, add, clear, uid, fmtDate, fmtTime, TOUCH } from './util.js';
 import { modal, confirmBox, toast } from './ui.js';
 import { compressImage, askPersistence, storageEstimate } from './files.js';
 
@@ -157,7 +157,7 @@ export function gallery(app, { filter, meta, empty, compact = false, onChange })
     'div',
     { class: 'dropzone' },
     el('button', { type: 'button', class: 'btn sm', onclick: () => input.click() }, '📷 Add screenshots'),
-    el('span', { class: 'small muted' }, 'or drag & drop · paste with Ctrl/⌘+V'),
+    el('span', { class: 'small muted' }, TOUCH ? 'screenshots, photos or camera' : 'or drag & drop · paste with Ctrl/⌘+V'),
     status,
     input,
   );

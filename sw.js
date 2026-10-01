@@ -1,6 +1,6 @@
 // Offline support. Network-first so updates show up right away; cache is the fallback.
 // Only the app's own static files are cached — your planner data lives encrypted in IndexedDB, never here.
-const CACHE = 'orbit-v8';
+const CACHE = 'orbit-v9';
 const ASSETS = [
   './',
   'index.html',
@@ -27,6 +27,8 @@ const ASSETS = [
   'vendor/pdfjs/pdf.min.mjs',
   'vendor/pdfjs/pdf.worker.min.mjs',
   'icons/icon.svg',
+  'icons/apple-touch-icon.png',
+  'icons/icon-192.png',
   'manifest.webmanifest',
 ];
 
