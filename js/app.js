@@ -412,6 +412,7 @@ async function enter(session) {
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
   for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses', 'inbox', 'frozen']) data[key] ||= [];
+  delete data.meals; // removed feature
   data.xp ||= 0;
   applyFreezes(data);
   data.studyLog ||= {};

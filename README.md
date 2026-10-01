@@ -49,16 +49,6 @@ Studying should feel like playing. Every set with 4+ cards has two game modes, a
 - **🎁 Mystery loot.** Finishing a session has a chance to drop a common, rare or epic XP orb. Unpredictable rewards keep it interesting.
 - **🔥 Combos and sounds** in Learn and Review, plus **🎲 Surprise me** and a **🎮 Quick game** button (`G`) when you can't decide what to do.
 
-## Meals
-
-Type your ZIP code and Orbit finds the restaurants around you, ranks which ones are worth ordering on **Uber Eats** right now, and tells you **what to order**:
-
-- Scores are based on distance, opening hours (open now / closes soon / open late), how well that food travels, and your own 👍/👎 ratings.
-- Moods: 📚 Study fuel (auto-suggested before an exam), 💸 Cheap eats, 🌙 Late night, 🥗 Light, 👥 Group order, 🎉 Treat yourself. You can also filter by craving, diet and open-now.
-- "What to order": specific orders, hacks and things to skip for ~50 big chains. For local places, the dishes that travel best for that cuisine.
-- 🎰 **Decide for me** spins between your top options. You can also log what you ordered, rate it and keep favorites.
-- Restaurant data comes from OpenStreetMap and ZIP lookup from Zippopotam.us. Only the ZIP and map area are sent. Uber Eats has no public menu API, so the button opens an Uber Eats search for that restaurant.
-
 ## Focus & ADHD support
 
 Built around what ADHD study research and clinicians recommend: make starting tiny, make time visible, take load off working memory, and reward effort instead of punishing slips. Everything is optional and lives under **Settings → Focus & ADHD support**.
@@ -142,8 +132,6 @@ js/apparse.js       CED parser, multiple-choice/answer-key parser, FRQ splitter,
 vendor/pdfjs/       Mozilla pdf.js (Apache-2.0), bundled so no outside servers are contacted
 js/focus.js         ADHD/focus tools: next action, sprints, parking lot, XP + streak freezes, read-aloud, noise, comfort display
 js/games.js         Blitz, Boss battle, daily quests, loot, combos, sound effects
-js/meals.js         Meals page: ZIP search, scoring, opening hours, what-to-order, decide-for-me
-js/mealdata.js      cuisine guide + chain menu tips
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
 js/files.js         IndexedDB storage + image compression

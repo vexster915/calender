@@ -12,7 +12,6 @@ import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, del
 import { renderCourses, renderCourse } from './ap.js';
 import { dueCount } from './srs.js';
 import { suggestSteps, addXP, applyComfort, stopNoise } from './focus.js';
-import { renderMeals } from './meals.js';
 
 // ------------------------------------------------------------------ shared bits
 const NO_CLASS = { id: null, name: 'Personal', code: 'ME', color: '#8a84b3' };
@@ -1769,7 +1768,6 @@ export const VIEWS = {
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
   files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },
   focus: { label: 'Focus timer', icon: '⏱', render: renderFocus, mobile: false },
-  meals: { label: 'Meals', icon: '🍔', render: renderMeals, mobile: false },
   settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
   set: { label: 'Study set', icon: '📚', render: renderSet },
   study: { label: 'Study', icon: '🪐', render: renderStudy },
@@ -1777,6 +1775,6 @@ export const VIEWS = {
 export const NAV_GROUPS = [
   ['Study', ['home', 'library', 'review', 'courses']],
   ['Plan', ['planner', 'classes', 'files']],
-  ['Tools', ['focus', 'settings', 'meals']],
+  ['Tools', ['focus', 'settings']],
 ];
 export const NAV_ORDER = NAV_GROUPS.flatMap(([, ids]) => ids);

@@ -74,7 +74,6 @@ export function emptyData() {
     docs: [],
     courses: [],
     inbox: [],
-    meals: { zip: '', radius: 3, favs: [], ratings: {}, history: [], cache: null },
     xp: 0,
     freezes: 1,
     frozen: [],
