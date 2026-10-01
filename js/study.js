@@ -8,6 +8,7 @@ import { streak, logActivity, meetingsOn, TYPE_META } from './logic.js';
 import { renderExam, questionBank, courseForSet } from './ap.js';
 import { sessionChrome, speakButton, speak, nextAction, startSprint, parkingCard, openParkingLot, levelProgress } from './focus.js';
 import { openItemEditor } from './views.js';
+import { newGame, renderBlitz, renderBoss, rollLoot, lootBanner, tally, sfx, questCard, comboChip } from './games.js';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -61,7 +62,16 @@ function finishSession(app, s, { cards = 0, correct = 0, fresh = 0 } = {}) {
   logActivity(app.data);
   const set = s.setId && setById(app, s.setId);
   if (set) set.lastStudied = new Date().toISOString();
+  if (set && cards) tally(app.data, 'set', set.id);
   app.save();
+}
+
+// A random game on the set that needs the most practice — no decisions needed.
+export function quickGame(app) {
+  const sets = app.data.sets.filter((s) => s.cards.length >= 4).sort((a, b) => mastery(a).pct - mastery(b).pct);
+  if (!sets.length) return toast('Make a study set with at least 4 cards to unlock games 🎮');
+  const pick = sets[Math.floor(Math.random() * Math.min(3, sets.length))];
+  startStudy(app, pick.id, Math.random() < 0.5 ? 'blitz' : 'boss');
 }
 
 // ------------------------------------------------------------------ Home (study-first dashboard)
@@ -200,10 +210,10 @@ export function renderHome(app) {
       'div',
       { class: 'stack', style: { gap: '6px', alignItems: 'stretch' } },
       el('button', { class: 'btn primary big-btn', onclick: next.run }, `${next.label} ▶`),
-      el('div', { class: 'row', style: { gap: '6px' } }, el('button', { class: 'btn sm', title: 'Short review sprint with a visible timer (J)', onclick: () => startSprint(app, startStudy) }, `⚡ Just ${data.settings.sprintMin || 5} min`), el('button', { class: 'btn sm', title: 'Park a distracting thought (P)', onclick: () => openParkingLot(app) }, '🅿️ Park a thought')),
+      el('div', { class: 'row', style: { gap: '6px' } }, el('button', { class: 'btn sm', title: 'Blitz or Boss battle on the set that needs it most (G)', onclick: () => quickGame(app) }, '🎮 Quick game'), el('button', { class: 'btn sm', title: 'Short review sprint with a visible timer (J)', onclick: () => startSprint(app, startStudy) }, `⚡ Just ${data.settings.sprintMin || 5} min`), el('button', { class: 'btn sm', title: 'Park a distracting thought (P)', onclick: () => openParkingLot(app) }, '🅿️ Park a thought')),
     ),
   );
-  return el('div', {}, hero, nextCard, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, parkingCard(app), drop, todayCard), setsCard));
+  return el('div', {}, hero, nextCard, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, questCard(app), parkingCard(app), drop, todayCard), setsCard));
 }
 
 function welcome(app, drop) {
@@ -344,6 +354,9 @@ export function renderSet(app) {
     modeTile('📝', 'Test', 'Practice test with a score', need(2, () => openTestSetup(app, set))),
     modeTile('⚡', 'Match', set.bestMatchMs ? `Best: ${(set.bestMatchMs / 1000).toFixed(1)}s` : 'Race the clock pairing terms', need(3, () => startStudy(app, set.id, 'match'))),
     modeTile('🧠', 'Review', dueN ? `${dueN} due now` : 'Spaced repetition', need(1, () => startStudy(app, set.id, 'review', { setIds: [set.id], title: set.title }))),
+    modeTile('⚡', 'Blitz', set.bestBlitz ? `Best: ${set.bestBlitz.toLocaleString()} pts` : '60-second combo rush', need(4, () => startStudy(app, set.id, 'blitz')), el('span', { class: 'mode-new' }, 'GAME')),
+    modeTile('🐉', 'Boss battle', 'Answer to attack. Type for 💥 power hits', need(4, () => startStudy(app, set.id, 'boss')), el('span', { class: 'mode-new' }, 'GAME')),
+    modeTile('🎲', 'Surprise me', 'Can’t pick? Let fate decide', need(4, () => startStudy(app, set.id, ['blitz', 'boss', 'learn', 'match'][Math.floor(Math.random() * 4)]))),
   );
 
   const orbitLegend = el(
@@ -868,7 +881,7 @@ function createSession(app, setId, mode, extra) {
   const set = setId && setById(app, setId);
   const base = { mode, setId, started: Date.now(), ...extra };
   if (mode === 'cards') {
-    return { ...base, order: set.cards.map((c) => c.id), i: 0, flipped: false, known: 0, learning: [], dir: 'term', done: false };
+    return { ...base, order: extra.order || set.cards.map((c) => c.id), i: 0, flipped: false, known: 0, learning: [], dir: 'term', done: false };
   }
   if (mode === 'learn') {
     // Each card needs to be answered right by multiple-choice, then by typing.
@@ -885,6 +898,7 @@ function createSession(app, setId, mode, extra) {
     return { ...base, queue, i: 0, shown: false, answered: 0, correct: 0, fresh: 0, again: [], done: !queue.length };
   }
   if (mode === 'test') return { ...base, ...extra };
+  if (mode === 'blitz' || mode === 'boss') return { ...base, ...newGame(set, mode) };
   return base;
 }
 
@@ -897,7 +911,7 @@ export function renderStudy(app) {
     return renderHome(app);
   }
   const set = s.setId && setById(app, s.setId);
-  const titles = { cards: 'Flashcards', learn: 'Learn', test: 'Test', match: 'Match', review: 'Review', exam: s.kind === 'unit' ? 'Unit test' : 'Practice exam' };
+  const titles = { cards: 'Flashcards', learn: 'Learn', test: 'Test', match: 'Match', review: 'Review', blitz: 'Blitz', boss: 'Boss battle', exam: s.kind === 'unit' ? 'Unit test' : 'Practice exam' };
   const back = async () => {
     if (s.mode === 'exam' && !['results'].includes(s.phase) && !(await confirmBox('Leave this test? Your answers will be lost.', { ok: 'Leave', danger: true }))) return;
     if (s.timer) clearInterval(s.timer);
@@ -920,8 +934,14 @@ export function renderStudy(app) {
   else if (s.mode === 'review') body = renderReview(app, s, top);
   else if (s.mode === 'test') body = renderTest(app, s, set, top);
   else if (s.mode === 'exam') body = renderExam(app, s, top);
-  // Time-awareness + focus tools (exams have their own official timer).
-  const chrome = s.mode !== 'exam' && !s.done ? sessionChrome(app, s) : null;
+  else if (s.mode === 'blitz' || s.mode === 'boss') {
+    const finish = (o) => finishSession(app, s, o);
+    const gameSummary = ({ big, line, details, missed }) =>
+      summary(app, s, set, { big, line, details, extra: missed.length ? el('button', { class: 'btn', onclick: () => startStudy(app, set.id, 'cards', { order: missed }) }, `🃏 Flashcards: the ${missed.length} you missed`) : null });
+    body = (s.mode === 'blitz' ? renderBlitz : renderBoss)(app, s, set, top, finish, gameSummary);
+  }
+  // Time-awareness + focus tools (exams and Blitz have their own timers).
+  const chrome = !['exam', 'blitz'].includes(s.mode) && !s.done ? sessionChrome(app, s) : null;
   if (chrome) add(top, chrome.tools);
   return el('div', { class: 'study' }, top, chrome?.bar, body);
 }
@@ -1000,6 +1020,7 @@ function summary(app, s, set, { big, line, extra, details }) {
       set && el('div', { style: { margin: '18px auto 6px', maxWidth: '420px' } }, orbitBar(set, { tall: true })),
       set && el('div', { class: 'small muted' }, `${mastery(set).pct}% of “${set.title}” mastered`),
       details,
+      lootBanner(rollLoot(app, s, s.answered || s.i || 0)),
       el(
         'div',
         { class: 'row wrap', style: { justifyContent: 'center', marginTop: '18px' } },
@@ -1021,6 +1042,7 @@ function renderLearn(app, s, set, top) {
   const done = levels.filter((l) => l >= 2).length;
   add(
     top,
+    comboChip(s.combo),
     el(
       'button',
       { class: 'btn sm', title: 'What you type', onclick: () => ((s.dir = s.dir === 'def' ? 'term' : 'def'), (s.queue = []), (s.feedback = null), app.render()) },
@@ -1085,6 +1107,8 @@ function renderLearn(app, s, set, top) {
     s.answered++;
     if (ok) s.correct++;
     const wasNew = isNew(card);
+    s.combo = ok ? (s.combo || 0) + 1 : 0;
+    sfx(app, !ok ? 'bad' : s.combo % 5 === 0 ? 'combo' : 'ok');
     if (ok) s.progress[card.id] = lvl + 1;
     else s.progress[card.id] = 0;
     // Written correct = strong recall; choice correct = partial; wrong = again.
@@ -1100,7 +1124,10 @@ function renderLearn(app, s, set, top) {
     s.feedback = null;
     s.queue.shift();
     if (fb && !fb.ok) s.queue.splice(Math.min(3, s.queue.length), 0, fb.cardId); // see it again soon
-    if (!s.queue.length) s.roundDone = true;
+    if (!s.queue.length) {
+      s.roundDone = true;
+      tally(app.data, 'rounds');
+    }
     app.render();
   };
 
@@ -1313,7 +1340,7 @@ function renderReview(app, s, top) {
     s.i++;
     return renderReview(app, s, top);
   }
-  add(top, el('span', { class: 'muted small' }, `${s.i + 1} / ${s.queue.length}`));
+  add(top, comboChip(s.combo), el('span', { class: 'muted small' }, `${s.i + 1} / ${s.queue.length}`));
   const p = prompt(card, 'term');
   s.speakText = s.shown ? `${p.q}. ${p.a}` : p.q;
   const rate = (q) => {
@@ -1321,6 +1348,8 @@ function renderReview(app, s, top) {
     grade(card, q);
     s.answered++;
     if (q > 0) s.correct++;
+    s.combo = q > 0 ? (s.combo || 0) + 1 : 0;
+    tally(app.data, 'reviews');
     logStudy(app.data, { cards: 1, correct: q > 0 ? 1 : 0, fresh: wasNew ? 1 : 0 });
     if (q === 0) s.queue.push({ ...item, why: 'again' });
     s.i++;

@@ -55,6 +55,7 @@ export function emptyData() {
       newPerDay: 15,
       // Focus & ADHD support
       focusMode: true, // hide the sidebar while studying
+      sfx: true, // game sound effects
       breakMin: 25, // gentle break check-in every N minutes (0 = off)
       chunk: 7, // cards per Learn round
       sprintMin: 5, // "Just 5 minutes" sprint length
@@ -73,6 +74,7 @@ export function emptyData() {
     docs: [],
     courses: [],
     inbox: [],
+    meals: { zip: '', radius: 3, favs: [], ratings: {}, history: [], cache: null },
     xp: 0,
     freezes: 1,
     frozen: [],

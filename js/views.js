@@ -12,6 +12,7 @@ import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, del
 import { renderCourses, renderCourse } from './ap.js';
 import { dueCount } from './srs.js';
 import { suggestSteps, addXP, applyComfort, stopNoise } from './focus.js';
+import { renderMeals } from './meals.js';
 
 // ------------------------------------------------------------------ shared bits
 const NO_CLASS = { id: null, name: 'Personal', code: 'ME', color: '#8a84b3' };
@@ -1437,8 +1438,9 @@ function focusCard(app, num, card) {
   };
   const comfort = () => applyComfort(s);
   return card(
-    '🎯 Focus & ADHD support',
-    el('p', { class: 'small muted', style: { margin: 0 } }, 'Tools for getting started, staying on track and noticing time. Shortcuts: J = quick sprint, P = park a distracting thought, R = read a card aloud.'),
+    '🎮 Focus & games',
+    el('p', { class: 'small muted', style: { margin: 0 } }, 'Blitz, Boss battles, daily quests and loot live on every study set and on Home. Shortcuts: G = quick game, J = quick sprint, P = park a distracting thought, R = read a card aloud.'),
+    toggle('sfx', 'Game sounds', 'little blips for right answers, combos and boss hits'),
     toggle('focusMode', 'Focus mode while studying', 'hides the sidebar and everything except the card in front of you'),
     toggle('timeBuffer', 'Time-blindness buffer', 'auto-plans assume work takes 1.5× your estimate'),
     toggle('calm', 'Calm mode', 'no confetti or motion', comfort),
@@ -1725,6 +1727,9 @@ export function openHelp() {
         el('div', { class: 'section-h' }, 'Keyboard'),
         row(el('span', {}, el('kbd', {}, 'N'), ' or ', el('kbd', {}, '/')), 'Quick add'),
         row(el('span', {}, el('kbd', {}, '1'), '–', el('kbd', {}, String(NAV_ORDER.length))), 'Switch views'),
+        row(el('kbd', {}, 'G'), 'Quick game (Blitz or Boss battle)'),
+        row(el('kbd', {}, 'J'), 'Quick review sprint'),
+        row(el('kbd', {}, 'P'), 'Park a distracting thought'),
         row(el('kbd', {}, 'L'), 'Lock Orbit'),
         row(el('kbd', {}, 'Esc'), 'Close a panel'),
         row(el('kbd', {}, '?'), 'This help'),
@@ -1764,6 +1769,7 @@ export const VIEWS = {
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
   files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },
   focus: { label: 'Focus timer', icon: '⏱', render: renderFocus, mobile: false },
+  meals: { label: 'Meals', icon: '🍔', render: renderMeals, mobile: false },
   settings: { label: 'Settings', short: 'More', icon: '⚙', render: renderSettings, mobile: true },
   set: { label: 'Study set', icon: '📚', render: renderSet },
   study: { label: 'Study', icon: '🪐', render: renderStudy },
@@ -1771,6 +1777,6 @@ export const VIEWS = {
 export const NAV_GROUPS = [
   ['Study', ['home', 'library', 'review', 'courses']],
   ['Plan', ['planner', 'classes', 'files']],
-  ['Tools', ['focus', 'settings']],
+  ['Tools', ['focus', 'settings', 'meals']],
 ];
 export const NAV_ORDER = NAV_GROUPS.flatMap(([, ids]) => ids);

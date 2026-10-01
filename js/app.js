@@ -6,7 +6,7 @@ import { parseQuickAdd } from './parse.js';
 import { closeModal, modalOpen, toast, logo, confetti } from './ui.js';
 import { forgetImages, uploadFiles } from './attach.js';
 import { VIEWS, NAV_ORDER, NAV_GROUPS, PLANNER_TABS, openItemEditor, openHelp } from './views.js';
-import { studyKey, startStudy } from './study.js';
+import { studyKey, startStudy, quickGame } from './study.js';
 import { applyComfort, applyFreezes, levelOf, streakWithFreezes, earnFreezes, openParkingLot, startSprint, stopNoise, addXP } from './focus.js';
 
 const root = document.getElementById('root');
@@ -599,6 +599,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'p' || e.key === 'P') return openParkingLot(app);
   if (e.key === 'j' || e.key === 'J') return startSprint(app, startStudy);
+  if (e.key === 'g' || e.key === 'G') return quickGame(app);
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= NAV_ORDER.length) {
     app.go(NAV_ORDER[n - 1]);
