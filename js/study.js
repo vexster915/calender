@@ -1,11 +1,13 @@
 // Orbit Study — study sets, card generation from PDFs/notes, and the study modes:
 //   Flashcards · Learn ("Orbit" adaptive mode) · Test · Match · Daily Review (spaced repetition)
-import { el, add, uid, fmtDate, relDay, relDue, fmtMinutes, dayKey, addDays, startOfDay, WEEKDAYS, clamp, fmtTime, sameDay } from './util.js';
+import { el, add, uid, fmtDate, relDay, relDue, fmtMinutes, dayKey, addDays, startOfDay, WEEKDAYS, clamp, fmtTime, sameDay, tone } from './util.js';
 import { modal, confirmBox, toast, confetti, svg } from './ui.js';
 import { generateCards, parseImport, checkAnswer } from './gen.js';
 import { ORBITS, newCard, grade, previewInterval, isNew, mastery, examsSoon, setsForItem, reviewQueue, dueCount, logStudy, studiedToday, shuffle } from './srs.js';
 import { streak, logActivity, meetingsOn, TYPE_META } from './logic.js';
 import { renderExam, questionBank, courseForSet } from './ap.js';
+import { sessionChrome, speakButton, speak, nextAction, startSprint, parkingCard, openParkingLot, levelProgress } from './focus.js';
+import { openItemEditor } from './views.js';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -82,7 +84,11 @@ export function renderHome(app) {
     el(
       'div',
       { class: 'stats' },
-      el('div', { class: 'stat' }, el('b', {}, streak(data) ? '🔥 ' : '', String(streak(data))), el('span', {}, 'day streak')),
+      el('div', { class: 'stat', title: 'Streak freezes cover a missed day automatically. You earn one for every 7-day streak (max 2).' }, el('b', {}, streak(data) ? '🔥 ' : '', String(streak(data)), data.freezes ? el('span', { class: 'freeze' }, ` 🧊${data.freezes}`) : null), el('span', {}, 'day streak')),
+      (() => {
+        const lp = levelProgress(data.xp);
+        return el('div', { class: 'stat', title: `${lp.toNext} XP to level ${lp.lvl + 1} — XP comes from effort: every card, minute and finished task.` }, el('b', {}, `⭐ ${lp.lvl}`), el('span', {}, 'level'), el('div', { class: 'xp-bar' }, el('div', { style: { width: `${lp.pct}%` } })));
+      })(),
       el('div', { class: 'stat' }, el('b', {}, `${today}/${goal}`), el('span', {}, 'cards today')),
       el('div', { class: 'stat' }, el('b', {}, `${mastered}`), el('span', {}, `of ${allCards} mastered`)),
     ),
@@ -183,7 +189,21 @@ export function renderHome(app) {
   if (!data.sets.length && !data.classes.length && !data.items.length) {
     return el('div', {}, hero, welcome(app, drop));
   }
-  return el('div', {}, hero, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, drop, todayCard), setsCard));
+  // ONE suggested next step, so you don't have to decide (decisions drain focus).
+  const next = nextAction(app, { startStudy, openItemEditor, openCreateSet });
+  const nextCard = el(
+    'div',
+    { class: 'card next-card' },
+    el('div', { class: 'next-icon' }, next.icon),
+    el('div', { style: { flex: 1, minWidth: 0 } }, el('div', { class: 'next-label' }, 'Your one next thing'), el('div', { class: 'next-title' }, next.title), el('div', { class: 'small muted' }, next.why)),
+    el(
+      'div',
+      { class: 'stack', style: { gap: '6px', alignItems: 'stretch' } },
+      el('button', { class: 'btn primary big-btn', onclick: next.run }, `${next.label} ▶`),
+      el('div', { class: 'row', style: { gap: '6px' } }, el('button', { class: 'btn sm', title: 'Short review sprint with a visible timer (J)', onclick: () => startSprint(app, startStudy) }, `⚡ Just ${data.settings.sprintMin || 5} min`), el('button', { class: 'btn sm', title: 'Park a distracting thought (P)', onclick: () => openParkingLot(app) }, '🅿️ Park a thought')),
+    ),
+  );
+  return el('div', {}, hero, nextCard, el('div', { class: 'dash' }, el('div', { class: 'stack' }, reviewCard, examCard), el('div', { class: 'stack' }, parkingCard(app), drop, todayCard), setsCard));
 }
 
 function welcome(app, drop) {
@@ -227,7 +247,7 @@ function setTile(app, set) {
     'div',
     { class: 'set-tile', onclick: () => app.go('set', { id: set.id }) },
     el('div', { class: 'band', style: { background: cls.color } }),
-    el('div', { class: 'small', style: { color: cls.color, fontWeight: 800, letterSpacing: '0.08em' } }, (cls.code || cls.name).toUpperCase()),
+    el('div', { class: 'small', style: { color: tone(cls.color), fontWeight: 800, letterSpacing: '0.08em' } }, (cls.code || cls.name).toUpperCase()),
     el('div', { class: 'set-title' }, set.title),
     el('div', { class: 'small muted' }, `${m.n} cards · ${m.pct}% mastered${dueN ? ` · ${dueN} due` : ''}`),
     orbitBar(set),
@@ -259,7 +279,7 @@ export function renderLibrary(app) {
   }
   sets.sort((a, b) => (b.lastStudied || b.createdAt).localeCompare(a.lastStudied || a.createdAt));
 
-  const search = el('input', { type: 'search', placeholder: 'Search sets and cards…', value: st.q });
+  const search = el('input', { type: 'search', placeholder: 'Search sets and cards…', 'aria-label': 'Search sets and cards', value: st.q });
   search.addEventListener('input', () => {
     st.q = search.value;
     const pos = search.selectionStart;
@@ -268,7 +288,7 @@ export function renderLibrary(app) {
     s?.focus();
     s?.setSelectionRange(pos, pos);
   });
-  const cls = el('select', {}, el('option', { value: 'all' }, 'All classes'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)), el('option', { value: 'none' }, 'General'));
+  const cls = el('select', { 'aria-label': 'Filter by class' }, el('option', { value: 'all' }, 'All classes'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)), el('option', { value: 'none' }, 'General'));
   cls.value = st.classId;
   cls.addEventListener('change', () => app.go('library', { classId: cls.value }));
 
@@ -307,7 +327,7 @@ export function renderSet(app) {
       'div',
       { style: { flex: 1, minWidth: 0 } },
       el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px' }, onclick: () => app.go('library') }, '← Library'),
-      el('div', { class: 'small', style: { color: cls.color, fontWeight: 800, letterSpacing: '0.08em', marginTop: '6px' } }, cls.name.toUpperCase()),
+      el('div', { class: 'small', style: { color: tone(cls.color), fontWeight: 800, letterSpacing: '0.08em', marginTop: '6px' } }, cls.name.toUpperCase()),
       el('h2', { style: { fontSize: '1.9em', letterSpacing: '-0.02em', margin: '2px 0 6px' } }, set.title),
       set.description && el('p', { class: 'muted', style: { margin: '0 0 6px' } }, set.description),
       el('div', { class: 'small muted' }, `${m.n} cards · created ${fmtDate(set.createdAt)}${set.lastStudied ? ` · studied ${relDay(new Date(set.lastStudied)).toLowerCase()}` : ''}`),
@@ -890,7 +910,7 @@ export function renderStudy(app) {
     'div',
     { class: 'study-top' },
     el('button', { class: 'btn sm', onclick: back }, '✕ Exit'),
-    el('div', { class: 'study-title' }, el('b', {}, titles[s.mode]), el('span', { class: 'muted' }, ` · ${s.title || set?.title || 'All sets'}`)),
+    el('h1', { class: 'study-title' }, el('b', {}, titles[s.mode]), el('span', { class: 'muted' }, ` · ${s.title || set?.title || 'All sets'}`)),
     el('span', { class: 'spacer' }),
   );
   let body;
@@ -900,7 +920,10 @@ export function renderStudy(app) {
   else if (s.mode === 'review') body = renderReview(app, s, top);
   else if (s.mode === 'test') body = renderTest(app, s, set, top);
   else if (s.mode === 'exam') body = renderExam(app, s, top);
-  return el('div', { class: 'study' }, top, body);
+  // Time-awareness + focus tools (exams have their own official timer).
+  const chrome = s.mode !== 'exam' && !s.done ? sessionChrome(app, s) : null;
+  if (chrome) add(top, chrome.tools);
+  return el('div', { class: 'study' }, top, chrome?.bar, body);
 }
 
 // ---------- Flashcards ----------
@@ -927,7 +950,7 @@ function renderFlashcards(app, s, set, top) {
   const flip = el(
     'div',
     { class: `flip${s.flipped ? ' flipped' : ''}`, onclick: () => ((s.flipped = !s.flipped), flip.classList.toggle('flipped')) },
-    el('div', { class: 'flip-inner' }, el('div', { class: 'face front' }, el('span', { class: 'face-label' }, p.qLabel), el('div', { class: 'face-text' }, p.q)), el('div', { class: 'face back' }, el('span', { class: 'face-label' }, p.aLabel), el('div', { class: 'face-text' }, p.a))),
+    el('div', { class: 'flip-inner' }, el('div', { class: 'face front' }, el('span', { class: 'face-label' }, p.qLabel), speakButton(p.q), el('div', { class: 'face-text', tabindex: 0 }, p.q)), el('div', { class: 'face back' }, el('span', { class: 'face-label' }, p.aLabel), speakButton(p.a), el('div', { class: 'face-text', tabindex: 0 }, p.a))),
   );
   const mark = (knew) => {
     grade(card, knew ? 2 : 0);
@@ -939,7 +962,7 @@ function renderFlashcards(app, s, set, top) {
     if (s.i >= cards.length) finishSession(app, s);
     app.commit();
   };
-  s.keys = { ' ': () => flip.click(), ArrowUp: () => flip.click(), ArrowDown: () => flip.click(), ArrowLeft: () => mark(false), ArrowRight: () => mark(true), 1: () => mark(false), 2: () => mark(true) };
+  s.keys = { ' ': () => flip.click(), ArrowUp: () => flip.click(), ArrowDown: () => flip.click(), ArrowLeft: () => mark(false), ArrowRight: () => mark(true), 1: () => mark(false), 2: () => mark(true), r: () => speak(s.flipped ? p.a : p.q) };
   return el(
     'div',
     { class: 'study-body' },
@@ -989,7 +1012,8 @@ function summary(app, s, set, { big, line, extra, details }) {
 }
 
 // ---------- Learn (adaptive) ----------
-const ROUND = 7;
+// Cards per Learn round — smaller chunks are easier to start and finish (Settings → Focus).
+const roundSize = (app) => app.data.settings.chunk || 7;
 function renderLearn(app, s, set, top) {
   const cards = set.cards;
   const total = cards.length;
@@ -1041,7 +1065,7 @@ function renderLearn(app, s, set, top) {
   if (!s.queue.length) {
     s.round++;
     const pending = cards.filter((c) => (s.progress[c.id] ?? 0) < 2);
-    s.queue = pending.slice(0, ROUND).map((c) => c.id);
+    s.queue = pending.slice(0, roundSize(app)).map((c) => c.id);
     s.inRound = s.queue.length;
   }
   const card = cards.find((c) => c.id === s.queue[0]);
@@ -1054,6 +1078,7 @@ function renderLearn(app, s, set, top) {
   // Multiple choice: see the term, pick the definition. Typing: see the definition, type the term (swappable).
   const dirFor = written ? s.dir : s.dir === 'def' ? 'term' : 'def';
   const p = prompt(card, dirFor);
+  s.speakText = p.q;
   const group = (c) => (c.kind === 'cloze' ? 'cloze' : c.kind === 'qa' ? 'qa' : 'def');
 
   const answer = (ok, given) => {
@@ -1166,7 +1191,7 @@ function renderLearn(app, s, set, top) {
     el(
       'div',
       { class: 'card question' },
-      el('div', { class: 'row small muted' }, el('span', {}, p.qLabel), el('span', { class: 'spacer' }), el('span', { class: 'chip' }, written ? '⌨ Type it' : '☝ Choose')),
+      el('div', { class: 'row small muted' }, el('span', {}, p.qLabel), el('span', { class: 'spacer' }), speakButton(p.q), el('span', { class: 'chip' }, written ? '⌨ Type it' : '☝ Choose')),
       el('div', { class: 'q-text' }, p.q),
       area,
     ),
@@ -1248,6 +1273,27 @@ function renderMatch(app, s, set, top) {
 
 // ---------- Review (spaced repetition) ----------
 function renderReview(app, s, top) {
+  // Sprint finished on time: celebrate, then offer (not demand) more.
+  if (s.sprint && s.timeUp && !s.done && !s.extended) {
+    s.keys = {};
+    return el(
+      'div',
+      { class: 'study-body' },
+      el(
+        'div',
+        { class: 'card summary' },
+        el('div', { class: 'big' }, '⏰'),
+        el('div', { class: 'summary-big grad-text' }, `${s.answered} card${s.answered === 1 ? '' : 's'}`),
+        el('div', { class: 'muted' }, `in ${s.sprintMin} minutes — that’s a win. Starting was the hard part.`),
+        el(
+          'div',
+          { class: 'row wrap', style: { justifyContent: 'center', marginTop: '18px' } },
+          el('button', { class: 'btn primary', onclick: () => Object.assign(s, { endsAt: Date.now() + s.sprintMin * 60000, timeUp: false }) && app.render() }, `Keep going — ${s.sprintMin} more min`),
+          el('button', { class: 'btn', onclick: () => ((s.done = true), finishSession(app, s), app.render()) }, 'I’m done for now'),
+        ),
+      ),
+    );
+  }
   if (s.done || s.i >= s.queue.length) {
     if (!s.done) {
       s.done = true;
@@ -1269,6 +1315,7 @@ function renderReview(app, s, top) {
   }
   add(top, el('span', { class: 'muted small' }, `${s.i + 1} / ${s.queue.length}`));
   const p = prompt(card, 'term');
+  s.speakText = s.shown ? `${p.q}. ${p.a}` : p.q;
   const rate = (q) => {
     const wasNew = isNew(card);
     grade(card, q);
@@ -1291,7 +1338,7 @@ function renderReview(app, s, top) {
     el(
       'div',
       { class: 'card question review' },
-      el('div', { class: 'row small muted' }, cls && el('span', { class: 'dot', style: { background: cls.color } }), el('span', {}, set?.title), el('span', { class: 'spacer' }), el('span', { class: 'chip' }, why)),
+      el('div', { class: 'row small muted' }, cls && el('span', { class: 'dot', style: { background: cls.color } }), el('span', {}, set?.title), el('span', { class: 'spacer' }), speakButton(s.shown ? `${p.q}. ${p.a}` : p.q), el('span', { class: 'chip' }, why)),
       el('div', { class: 'q-text' }, p.q),
       s.shown ? el('div', { class: 'answer-reveal' }, el('div', { class: 'small muted' }, p.aLabel), el('div', { class: 'a-text' }, p.a)) : null,
     ),
@@ -1557,7 +1604,9 @@ export function renderReviewHub(app) {
 export function studyKey(app, e) {
   if (app.view !== 'study') return false;
   const s = app.viewState.study?.session;
-  const fn = s?.keys?.[e.key];
+  let fn = s?.keys?.[e.key];
+  // R reads the current question aloud in any mode that sets one.
+  if (!fn && (e.key === 'r' || e.key === 'R') && s?.speakText) fn = () => speak(s.speakText);
   if (!fn) return false;
   e.preventDefault();
   fn();

@@ -1,6 +1,6 @@
 // Offline support. Network-first so updates show up right away; cache is the fallback.
-// Only the app's own static files are cached — your planner data lives encrypted in localStorage, never here.
-const CACHE = 'orbit-v5';
+// Only the app's own static files are cached — your planner data lives encrypted in IndexedDB, never here.
+const CACHE = 'orbit-v6';
 const ASSETS = [
   './',
   'index.html',
@@ -22,6 +22,7 @@ const ASSETS = [
   'js/apcatalog.js',
   'js/apparse.js',
   'js/aptopics.js',
+  'js/focus.js',
   'vendor/pdfjs/pdf.min.mjs',
   'vendor/pdfjs/pdf.worker.min.mjs',
   'icons/icon.svg',

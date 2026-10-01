@@ -1,8 +1,5 @@
 // All the screens inside Orbit, plus the item and class editors.
-import {
-  el, add, clear, uid, addDays, startOfDay, sameDay, dayKey, fromDayKey, fmtTime, fmtDate, relDay, relDue,
-  fmtMinutes, toLocalInput, WEEKDAYS, WEEKDAYS_LONG, MONTHS_LONG, clamp,
-} from './util.js';
+import { el, add, clear, uid, addDays, startOfDay, sameDay, dayKey, fromDayKey, fmtTime, fmtDate, relDay, relDue, fmtMinutes, toLocalInput, WEEKDAYS, WEEKDAYS_LONG, MONTHS_LONG, clamp, paint, tone } from './util.js';
 import {
   TYPE_META, CLASS_COLORS, priority, sortByPriority, autoPlan, forecast, sessionsOn, classGrade, letter, neededFor,
   streak, meetingsOn, focusMinutesOn, logActivity, remainingMin, toICS, sampleData,
@@ -14,13 +11,14 @@ import { gallery, renderFiles, openSchedule } from './attach.js';
 import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, deleteSet } from './study.js';
 import { renderCourses, renderCourse } from './ap.js';
 import { dueCount } from './srs.js';
+import { suggestSteps, addXP, applyComfort, stopNoise } from './focus.js';
 
 // ------------------------------------------------------------------ shared bits
 const NO_CLASS = { id: null, name: 'Personal', code: 'ME', color: '#8a84b3' };
 const classOf = (app, item) => app.classById(item.classId) || NO_CLASS;
 
 function classChip(cls) {
-  return el('span', { class: 'chip cls', style: { background: cls.color } }, cls.code || cls.name);
+  return el('span', { class: 'chip cls', style: { ...paint(cls.color) } }, cls.code || cls.name);
 }
 function priorityChip(item) {
   const p = priority(item);
@@ -399,7 +397,7 @@ function renderHorizon(app) {
           add(cell, 
             el(
               'div',
-              { class: `hz-pill${item.done ? ' done' : ''}`, style: { background: lane.color }, title: `${item.title} — ${dueText(item)}`, onclick: () => openItemEditor(app, item) },
+              { class: `hz-pill${item.done ? ' done' : ''}`, style: { ...paint(lane.color) }, title: `${item.title} — ${dueText(item)}`, onclick: () => openItemEditor(app, item) },
               `${TYPE_META[item.type].icon} ${item.title}`,
             ),
           );
@@ -479,7 +477,7 @@ function renderMonth(app) {
       },
       heat,
       el('div', { class: 'n' }, String(d.getDate())),
-      items.slice(0, 3).map((it) => el('div', { class: `ev${it.done ? ' done' : ''}`, style: { background: classOf(app, it).color } }, it.title)),
+      items.slice(0, 3).map((it) => el('div', { class: `ev${it.done ? ' done' : ''}`, style: paint(classOf(app, it).color) }, it.title)),
       items.length > 3 && el('div', { class: 'more' }, `+${items.length - 3} more`),
     );
     add(grid, cell);
@@ -500,7 +498,7 @@ function renderMonth(app) {
     el('div', { class: 'section-h', style: { marginTop: '12px' } }, 'Study blocks'),
     selSessions.length ? el('div', { class: 'stack', style: { gap: '6px', marginTop: '6px' } }, selSessions.map(({ item, session }) => sessionRow(app, item, session))) : el('div', { class: 'muted small', style: { padding: '6px 0' } }, 'None planned.'),
     meetings.length > 0 && el('div', { class: 'section-h', style: { marginTop: '12px' } }, 'Classes'),
-    meetings.map(({ cls, meeting }) => el('div', { class: 'row small', style: { padding: '4px 0' } }, el('span', { class: 'chip cls', style: { background: cls.color } }, cls.code || cls.name), `${meeting.start}–${meeting.end}`, cls.room && el('span', { class: 'muted' }, cls.room))),
+    meetings.map(({ cls, meeting }) => el('div', { class: 'row small', style: { padding: '4px 0' } }, el('span', { class: 'chip cls', style: { ...paint(cls.color) } }, cls.code || cls.name), `${meeting.start}–${meeting.end}`, cls.room && el('span', { class: 'muted' }, cls.room))),
     el(
       'button',
       {
@@ -571,7 +569,7 @@ function renderTasks(app) {
   }
   if (!items.length) add(list, el('div', { class: 'empty' }, el('div', { class: 'big' }, '✨'), st.filter === 'upcoming' ? 'All clear!' : 'Nothing here.'));
 
-  const search = el('input', { type: 'search', placeholder: 'Search…', value: st.q });
+  const search = el('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search tasks', value: st.q });
   search.addEventListener('input', () => {
     st.q = search.value;
     const pos = search.selectionStart;
@@ -581,8 +579,8 @@ function renderTasks(app) {
     s?.setSelectionRange(pos, pos);
   });
 
-  const select = (value, options, onchange) => {
-    const s = el('select', {}, options.map(([v, l]) => el('option', { value: v }, l)));
+  const select = (value, options, onchange, label) => {
+    const s = el('select', { 'aria-label': label }, options.map(([v, l]) => el('option', { value: v }, l)));
     s.value = value;
     s.addEventListener('change', () => onchange(s.value));
     return s;
@@ -596,9 +594,9 @@ function renderTasks(app) {
       'div',
       { class: 'filters' },
       el('div', { class: 'seg' }, [['upcoming', 'Open'], ['overdue', 'Overdue'], ['done', 'Done'], ['all', 'All']].map(([v, l]) => el('button', { class: st.filter === v ? 'on' : '', onclick: () => app.go('tasks', { filter: v }) }, l))),
-      select(st.classId, [['all', 'All classes'], ...app.data.classes.map((c) => [c.id, c.name]), ['none', 'Personal']], (v) => app.go('tasks', { classId: v })),
-      select(st.type, [['all', 'All types'], ...TYPES.map((t) => [t, TYPE_META[t].label])], (v) => app.go('tasks', { type: v })),
-      select(st.sort, [['priority', 'Sort: priority'], ['due', 'Sort: due date']], (v) => app.go('tasks', { sort: v })),
+      select(st.classId, [['all', 'All classes'], ...app.data.classes.map((c) => [c.id, c.name]), ['none', 'Personal']], (v) => app.go('tasks', { classId: v }), 'Filter by class'),
+      select(st.type, [['all', 'All types'], ...TYPES.map((t) => [t, TYPE_META[t].label])], (v) => app.go('tasks', { type: v }), 'Filter by type'),
+      select(st.sort, [['priority', 'Sort: priority'], ['due', 'Sort: due date']], (v) => app.go('tasks', { sort: v }), 'Sort order'),
       search,
     ),
     el('div', { class: 'card', style: { padding: '8px' } }, list),
@@ -641,8 +639,8 @@ function renderClasses(app) {
         el(
           'div',
           { style: { flex: 1, minWidth: 0 } },
-          el('div', { class: 'code', style: { color: c.color } }, c.code || ''),
-          el('h4', {}, c.name),
+          el('div', { class: 'code', style: { color: tone(c.color) } }, c.code || ''),
+          el('h3', { class: 'class-name' }, c.name),
           el('div', { class: 'small muted' }, [c.teacher, c.room].filter(Boolean).join(' · ') || '—'),
           el('div', { class: 'small muted', style: { marginTop: '4px' } }, (c.meetings || []).length ? c.meetings.map((m) => `${WEEKDAYS[m.day]} ${m.start}`).join(', ') : 'No meeting times'),
         ),
@@ -680,7 +678,7 @@ function renderClasses(app) {
         if (m.day !== d) continue;
         const top = clamp(y(m.start), 0, height);
         const bottom = clamp(y(m.end), 0, height);
-        add(col, el('div', { class: 'ws-block', style: { top: `${top}px`, height: `${Math.max(18, bottom - top)}px`, background: c.color }, title: `${c.name} ${m.start}–${m.end}`, onclick: () => openClassEditor(app, c) }, c.code || c.name));
+        add(col, el('div', { class: 'ws-block', style: { top: `${top}px`, height: `${Math.max(18, bottom - top)}px`, ...paint(c.color) }, title: `${c.name} ${m.start}–${m.end}`, onclick: () => openClassEditor(app, c) }, c.code || c.name));
       }
     }
     add(sched, col);
@@ -948,6 +946,19 @@ export function openItemEditor(app, item, opts = {}) {
         );
       }),
       newSub,
+      !draft.subtasks.length &&
+        el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            title: 'Break this into small starter steps (you can edit or delete them)',
+            onclick: () => {
+              draft.subtasks = suggestSteps(draft.type);
+              ctl.rebuild();
+            },
+          },
+          '✨ Suggest small steps',
+        ),
     );
 
     // Study plan
@@ -1244,6 +1255,7 @@ function finishPhase(app) {
       }
     }
     logActivity(app.data);
+    addXP(app.data, minutes);
     f.count += 1;
     f.mode = f.count % 4 === 0 ? 'long' : 'short';
     notify('Focus session complete', `+${minutes} min${item ? ` on ${item.title}` : ''}. Take a break!`);
@@ -1400,6 +1412,53 @@ function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// Focus & ADHD support settings — every one of these is optional and reversible.
+function focusCard(app, num, card) {
+  const s = app.data.settings;
+  const toggle = (key, label, hint, after) => {
+    const cb = el('input', { type: 'checkbox', class: 'check sq', checked: !!s[key] });
+    cb.addEventListener('change', () => {
+      s[key] = cb.checked;
+      after?.();
+      app.commit({ render: false });
+      toast('Saved');
+    });
+    return el('label', { class: 'toggle-row' }, cb, el('span', {}, el('b', {}, label), el('span', { class: 'small muted' }, ` — ${hint}`)));
+  };
+  const pick = (key, label, options, after) => {
+    const sel = el('select', { 'aria-label': label }, options.map(([v, l]) => el('option', { value: v, selected: s[key] === v }, l)));
+    sel.addEventListener('change', () => {
+      s[key] = sel.value;
+      after?.();
+      app.commit({ render: false });
+      toast('Saved');
+    });
+    return el('label', { class: 'field' }, el('span', {}, label), sel);
+  };
+  const comfort = () => applyComfort(s);
+  return card(
+    '🎯 Focus & ADHD support',
+    el('p', { class: 'small muted', style: { margin: 0 } }, 'Tools for getting started, staying on track and noticing time. Shortcuts: J = quick sprint, P = park a distracting thought, R = read a card aloud.'),
+    toggle('focusMode', 'Focus mode while studying', 'hides the sidebar and everything except the card in front of you'),
+    toggle('timeBuffer', 'Time-blindness buffer', 'auto-plans assume work takes 1.5× your estimate'),
+    toggle('calm', 'Calm mode', 'no confetti or motion', comfort),
+    toggle('comfortSpacing', 'Relaxed spacing', 'extra line and letter spacing for easier reading', comfort),
+    el(
+      'div',
+      { class: 'grid-3' },
+      num('sprintMin', 'Sprint length (min)', 2, 30, 1),
+      num('chunk', 'Cards per Learn round', 3, 20, 1),
+      num('breakMin', 'Break check-in every (min, 0 = off)', 0, 90, 5),
+    ),
+    el(
+      'div',
+      { class: 'grid-2' },
+      pick('noise', 'Focus noise', [['brown', 'Brown noise (deep, soft)'], ['pink', 'Pink noise (balanced)'], ['white', 'White noise (bright)']], () => stopNoise()),
+      pick('comfortText', 'Text size', [['normal', 'Normal'], ['large', 'Large'], ['xl', 'Extra large']], comfort),
+    ),
+  );
+}
+
 function renderSettings(app) {
   const s = app.data.settings;
   const num = (key, label, min, max, step = 5) => {
@@ -1494,6 +1553,7 @@ function renderSettings(app) {
         el('div', { class: 'grid-2' }, num('dailyGoal', 'Daily goal (cards)', 5, 500, 5), num('newPerDay', 'New cards per day in Review', 0, 200, 5)),
         el('p', { class: 'small muted', style: { margin: 0 } }, 'New cards are introduced gradually so reviews never pile up. Exams in the Planner automatically pull their class’s cards forward.'),
       ),
+      focusCard(app, num, card),
       card(
         '🧭 Planning',
         el('div', { class: 'grid-2' }, num('sessionMin', 'Study session length (min)', 15, 180), num('dailyCapMin', 'Daily capacity (min)', 30, 720, 15)),

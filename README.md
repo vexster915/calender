@@ -39,6 +39,21 @@ The catalog was checked line by line against the **2025–26 CEDs** for all 23 c
 
 **Regular classes:** your own PDFs come first. If you have none, the AP & Courses page suggests free, openly-licensed material for each class, such as an OpenStax textbook (downloadable PDF) and Khan Academy, which you can upload to make a study set.
 
+## Focus & ADHD support
+
+Built around what ADHD study research and clinicians recommend: make starting tiny, make time visible, take load off working memory, and reward effort instead of punishing slips. Everything is optional and lives under **Settings → Focus & ADHD support**.
+
+- **Your one next thing.** Home suggests a single next step (an exam to prep for, an overdue task, due cards) so you don't have to choose between ten things.
+- **"Just 5 minutes" sprints** (`J`). A short review with a visible countdown. When time's up you choose: keep going or stop, guilt-free.
+- **Focus mode.** While studying, the sidebar and everything else disappears. Only the card in front of you is left.
+- **Visible time.** Every session shows elapsed time (or a countdown) and gives a gentle break check-in every N minutes.
+- **Parking lot** (`P`). Catch a distracting thought in one keystroke without leaving the session. It waits on Home.
+- **Small chunks.** Learn rounds default to 7 cards (adjustable). **✨ Suggest small steps** breaks a big assignment, project, lab or exam into 5–15 minute starter steps.
+- **Time-blindness buffer.** Auto-plans can assume work takes 1.5× your estimate.
+- **Read aloud** (`R` or 🔈) and **background noise** (brown, pink or white, generated in the browser) for anyone who focuses better with sound.
+- **Effort-based rewards.** You earn XP for every card, minute and finished task, and you level up. Streak freezes (one per 7-day streak, max 2) cover a missed day automatically, so one bad day doesn't wipe your progress.
+- **Comfort display.** Larger text, relaxed spacing, and a calm mode with no confetti or motion.
+
 ## Planner (background)
 
 The original planner lives under **Planner**: an overview with a workload forecast, a 3-week Horizon view, a month heat map, and tasks, plus natural-language quick add (`Calc midterm oct 14 9am #math !exam`), classes with grades, screenshots of schedules and work, and a focus timer.
@@ -105,6 +120,7 @@ js/ap.js            AP courses: units, CED import, AP Classroom material, unit t
 js/apcatalog.js     AP course catalog (units, exam weightings, exam formats) + free resources for regular classes
 js/apparse.js       CED parser, multiple-choice/answer-key parser, FRQ splitter, unit detection
 vendor/pdfjs/       Mozilla pdf.js (Apache-2.0), bundled so no outside servers are contacted
+js/focus.js         ADHD/focus tools: next action, sprints, parking lot, XP + streak freezes, read-aloud, noise, comfort display
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
 js/files.js         IndexedDB storage + image compression

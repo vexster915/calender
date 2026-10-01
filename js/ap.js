@@ -1,6 +1,6 @@
 // AP courses: official unit structure, CED import, AP Classroom material, unit tests and
 // full practice AP exams built on the real exam format.
-import { el, add, uid, fmtDate, clamp } from './util.js';
+import { el, add, uid, fmtDate, clamp, tone } from './util.js';
 import { modal, confirmBox, toast, confetti } from './ui.js';
 import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor, TASK_VERBS } from './apcatalog.js';
 import { parseCED, cedCards, parseMCQ, splitFRQ, detectUnit } from './apparse.js';
@@ -69,7 +69,7 @@ function courseTile(app, course) {
     'div',
     { class: 'set-tile', onclick: () => app.go('course', { id: course.id }) },
     el('div', { class: 'band', style: { background: info.color } }),
-    el('div', { class: 'row' }, el('div', { style: { flex: 1 } }, el('div', { class: 'small', style: { color: info.color, fontWeight: 800, letterSpacing: '0.08em' } }, info.area.toUpperCase()), el('div', { class: 'set-title' }, info.name)), ring(ready, info.color, 54)),
+    el('div', { class: 'row' }, el('div', { style: { flex: 1 } }, el('div', { class: 'small', style: { color: tone(info.color), fontWeight: 800, letterSpacing: '0.08em' } }, info.area.toUpperCase()), el('div', { class: 'set-title' }, info.name)), ring(ready, info.color, 54)),
     el('div', { class: 'small muted' }, `${info.units.length} ${(info.unitWord || 'unit').toLowerCase()}s · ${cards} cards · ${qs} questions`),
     last ? el('div', { class: 'small' }, `Last ${last.kind === 'unit' ? 'unit test' : 'practice exam'}: `, el('b', {}, last.apScore ? `${last.apScore} (est.)` : `${Math.round(last.pct)}%`)) : el('div', { class: 'small faint' }, 'No tests taken yet'),
   );
@@ -209,7 +209,7 @@ export function renderCourse(app) {
       'div',
       { style: { flex: 1, minWidth: 0 } },
       el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px' }, onclick: () => app.go('courses') }, '← AP & Courses'),
-      el('div', { class: 'small', style: { color: info.color, fontWeight: 800, letterSpacing: '0.08em', marginTop: '6px' } }, info.area.toUpperCase()),
+      el('div', { class: 'small', style: { color: tone(info.color), fontWeight: 800, letterSpacing: '0.08em', marginTop: '6px' } }, info.area.toUpperCase()),
       el('h2', { style: { fontSize: '1.9em', letterSpacing: '-0.02em', margin: '2px 0 8px' } }, info.name),
       el(
         'div',
@@ -380,7 +380,7 @@ function unitsTab(app, course, info) {
       el(
         'div',
         { class: 'unit-row' },
-        el('div', { class: 'unit-num', style: { borderColor: info.color, color: info.color } }, '★'),
+        el('div', { class: 'unit-num', style: { borderColor: info.color, color: tone(info.color) } }, '★'),
         el('div', { style: { flex: 1 } }, el('b', {}, 'Skills (from the CED)'), el('div', { class: 'small muted' }, `${skills.cards.length} cards · ${mastery(skills).pct}% mastered — used in every unit`)),
         el('button', { class: 'btn sm primary', onclick: () => app.go('set', { id: skills.id }) }, 'Study'),
       ),
@@ -396,7 +396,7 @@ function unitsTab(app, course, info) {
       const row = el(
         'div',
         { class: 'unit-row' },
-        el('div', { class: 'unit-num', style: { borderColor: info.color, color: info.color } }, String((info.unitStart || 1) + i)),
+        el('div', { class: 'unit-num', style: { borderColor: info.color, color: tone(info.color) } }, String((info.unitStart || 1) + i)),
         el(
           'div',
           { style: { flex: 1, minWidth: 0 } },

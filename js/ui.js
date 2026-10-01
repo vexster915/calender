@@ -85,6 +85,15 @@ export function confirmBox(message, { ok = 'Confirm', danger = false } = {}) {
 
 export function toast(message, { action, onAction, ms = 3200 } = {}) {
   const box = document.getElementById('toasts');
+  // Same message already showing (e.g. "Saved" after several edits)? Keep one, restart its timer.
+  if (!action) {
+    const same = [...box.children].find((n) => n.dataset.msg === message);
+    if (same) {
+      clearTimeout(same._timer);
+      same._timer = setTimeout(() => same.remove(), ms);
+      return same;
+    }
+  }
   const t = el(
     'div',
     { class: 'toast' },
@@ -101,14 +110,15 @@ export function toast(message, { action, onAction, ms = 3200 } = {}) {
         action,
       ),
   );
+  t.dataset.msg = message;
   box.appendChild(t);
-  setTimeout(() => t.remove(), ms);
+  t._timer = setTimeout(() => t.remove(), ms);
   return t;
 }
 
 const CONFETTI_COLORS = ['#8b6cff', '#ff6b8b', '#1fc8a9', '#ffb020', '#3aa0ff'];
 export function confetti(x, y, n = 22) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.calm === 'on') return;
   for (let i = 0; i < n; i++) {
     const angle = Math.random() * Math.PI * 2;
     const dist = 40 + Math.random() * 90;

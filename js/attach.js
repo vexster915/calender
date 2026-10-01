@@ -288,10 +288,10 @@ export function renderFiles(app, pageTitle) {
   const st = (app.viewState.files ||= { classId: 'all', kind: 'all', uploadKind: 'schedule', uploadClass: '' });
   const filter = (a) => (st.classId === 'all' || (a.classId || 'none') === st.classId) && (st.kind === 'all' || a.kind === st.kind);
 
-  const kindSel = el('select', {}, Object.entries(KINDS).map(([k, v]) => el('option', { value: k }, `${v.icon} ${v.label}`)));
+  const kindSel = el('select', { 'aria-label': 'Screenshot type' }, Object.entries(KINDS).map(([k, v]) => el('option', { value: k }, `${v.icon} ${v.label}`)));
   kindSel.value = st.uploadKind;
   kindSel.addEventListener('change', () => (st.uploadKind = kindSel.value));
-  const classSel = el('select', {}, el('option', { value: '' }, 'No class / general'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)));
+  const classSel = el('select', { 'aria-label': 'Class' }, el('option', { value: '' }, 'No class / general'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)));
   classSel.value = st.uploadClass;
   classSel.addEventListener('change', () => (st.uploadClass = classSel.value));
 
@@ -328,7 +328,7 @@ export function renderFiles(app, pageTitle) {
       { class: 'filters' },
       el('div', { class: 'seg' }, chip('all', 'All', 'kind'), Object.entries(KINDS).map(([k, v]) => chip(k, `${v.icon} ${v.label}`, 'kind'))),
       (() => {
-        const s = el('select', {}, el('option', { value: 'all' }, 'All classes'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)), el('option', { value: 'none' }, 'No class'));
+        const s = el('select', { 'aria-label': 'Filter by class' }, el('option', { value: 'all' }, 'All classes'), app.data.classes.map((c) => el('option', { value: c.id }, c.name)), el('option', { value: 'none' }, 'No class'));
         s.value = st.classId;
         s.addEventListener('change', () => app.go('files', { classId: s.value }));
         return s;

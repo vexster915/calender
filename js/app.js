@@ -1,12 +1,13 @@
 // Orbit — app shell: authentication screens, navigation, saving, auto-lock, quick add.
-import { el, add, clear, uid, fmtDate, fmtTime, debounce } from './util.js';
+import { el, add, clear, uid, fmtDate, fmtTime, debounce, paint } from './util.js';
 import * as vault from './vault.js';
 import { emptyData, autoPlan, TYPE_META, logActivity } from './logic.js';
 import { parseQuickAdd } from './parse.js';
 import { closeModal, modalOpen, toast, logo, confetti } from './ui.js';
 import { forgetImages, uploadFiles } from './attach.js';
 import { VIEWS, NAV_ORDER, NAV_GROUPS, PLANNER_TABS, openItemEditor, openHelp } from './views.js';
-import { studyKey } from './study.js';
+import { studyKey, startStudy } from './study.js';
+import { applyComfort, applyFreezes, levelOf, streakWithFreezes, earnFreezes, openParkingLot, startSprint, stopNoise, addXP } from './focus.js';
 
 const root = document.getElementById('root');
 
@@ -30,8 +31,20 @@ const app = {
 
   // Call after any change to data: re-renders and saves (encrypted).
   commit({ render = true } = {}) {
+    this.celebrate();
     this.save();
     if (render) this.render();
+  },
+
+  // Immediate, effort-based rewards: level-ups and earned streak freezes.
+  celebrate() {
+    const lvl = levelOf(this.data.xp);
+    if (this.lastLevel && lvl > this.lastLevel) {
+      toast(`⭐ Level ${lvl}! Every rep counts.`, { ms: 4500 });
+      confetti(window.innerWidth / 2, window.innerHeight / 3, 40);
+    }
+    this.lastLevel = lvl;
+    if (earnFreezes(this.data, streakWithFreezes(this.data))) toast('🧊 You earned a streak freeze — miss a day and your streak survives.', { ms: 5000 });
   },
 
   async save() {
@@ -73,6 +86,7 @@ const app = {
     item.doneAt = item.done ? new Date().toISOString() : null;
     if (item.done) {
       logActivity(this.data);
+      addXP(this.data, 15);
       if (evt) confetti(evt.clientX, evt.clientY);
       toast(`Nice — "${item.title}" done`, {
         action: 'Undo',
@@ -89,6 +103,8 @@ const app = {
   async lock(reason) {
     if (this.saving || this.dirty) await this.save();
     closeModal();
+    stopNoise();
+    window.speechSynthesis?.cancel();
     this.session?.lock();
     this.session = null;
     this.data = null;
@@ -312,7 +328,7 @@ function renderAuth(tab = vault.listAccounts().length ? 'login' : 'signup', noti
 
   root.appendChild(
     el(
-      'div',
+      'main',
       { class: 'auth' },
       el(
         'div',
@@ -349,7 +365,7 @@ function showRecoveryCode(session, code, isNew) {
   };
   root.appendChild(
     el(
-      'div',
+      'main',
       { class: 'auth' },
       el(
         'div',
@@ -395,7 +411,9 @@ async function enter(session) {
   if (!data) data = emptyData();
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
-  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses']) data[key] ||= [];
+  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses', 'inbox', 'frozen']) data[key] ||= [];
+  data.xp ||= 0;
+  applyFreezes(data);
   data.studyLog ||= {};
   app.session = session;
   app.data = data;
@@ -403,6 +421,8 @@ async function enter(session) {
   app.plannerTab = 'launch';
   app.lastActivity = Date.now();
   applyTheme(data.settings.theme);
+  applyComfort(data.settings);
+  app.lastLevel = levelOf(data.xp);
   app.render();
 }
 
@@ -463,7 +483,9 @@ function renderShell() {
     ),
   );
 
-  root.appendChild(el('div', { class: 'shell' }, sidebar, main, mobileNav));
+  // Focus mode: while studying, hide everything except the work.
+  const focus = app.view === 'study' && app.data.settings.focusMode;
+  root.appendChild(el('div', { class: `shell${focus ? ' focus' : ''}` }, sidebar, main, mobileNav));
 }
 
 function quickAddBar(keep) {
@@ -487,7 +509,7 @@ function quickAddBar(keep) {
     add(preview, 
       el('b', {}, p.title || '(untitled)'),
       el('span', { class: 'chip' }, `${TYPE_META[p.type].icon} ${TYPE_META[p.type].label}`),
-      cls && el('span', { class: 'chip cls', style: { background: cls.color } }, cls.code || cls.name),
+      cls && el('span', { class: 'chip cls', style: { ...paint(cls.color) } }, cls.code || cls.name),
       p.due ? el('span', { class: 'chip steady' }, `📅 ${fmtDate(p.due)}${p.hasTime ? ' · ' + fmtTime(p.due) : ''}`) : el('span', { class: 'chip' }, 'no date'),
       p.estimateMin && el('span', { class: 'chip' }, `⏱ ${p.estimateMin}m`),
       p.weight && el('span', { class: 'chip' }, `⚖ ${p.weight}%`),
@@ -572,9 +594,11 @@ document.addEventListener('keydown', (e) => {
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (app.view === 'study') {
-    studyKey(app, e);
+    if (!studyKey(app, e) && (e.key === 'p' || e.key === 'P')) openParkingLot(app);
     return;
   }
+  if (e.key === 'p' || e.key === 'P') return openParkingLot(app);
+  if (e.key === 'j' || e.key === 'J') return startSprint(app, startStudy);
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= NAV_ORDER.length) {
     app.go(NAV_ORDER[n - 1]);
@@ -620,7 +644,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 if (!window.crypto?.subtle) {
   root.appendChild(
-    el('div', { class: 'auth' }, el('div', { class: 'card auth-card' }, el('h2', {}, 'Secure context required'), el('p', { class: 'muted' }, 'Orbit needs HTTPS (or localhost) to use the browser\'s encryption. Open it from its GitHub Pages https:// address.'))),
+    el('main', { class: 'auth' }, el('div', { class: 'card auth-card' }, el('h2', {}, 'Secure context required'), el('p', { class: 'muted' }, 'Orbit needs HTTPS (or localhost) to use the browser\'s encryption. Open it from its GitHub Pages https:// address.'))),
   );
 } else {
   renderAuth();

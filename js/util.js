@@ -142,3 +142,31 @@ export function debounce(fn, ms) {
 export function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
 }
+
+// ---------- color contrast ----------
+function luminance(hex) {
+  const h = String(hex).replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/./g, '$&$&') : h, 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+// Text color for something drawn ON a colored background: whichever of white / ink has more contrast.
+export function ink(bg) {
+  if (!/^#[0-9a-f]{3,6}$/i.test(String(bg))) return '#fff';
+  const L = luminance(bg);
+  return (1.05 / (L + 0.05) >= (L + 0.05) / (luminance('#1c1640') + 0.05) ? '#fff' : '#1c1640');
+}
+// Background + text for a colored pill/block. Mid-tone colors that can't reach 4.5:1 with
+// either text color get darkened slightly so labels stay readable.
+export function paint(bg) {
+  const color = ink(bg);
+  if (color === '#fff' && /^#[0-9a-f]{3,6}$/i.test(String(bg)) && 1.05 / (luminance(bg) + 0.05) < 4.6) return { background: `color-mix(in srgb, ${bg} 80%, #000)`, color };
+  return { background: bg, color };
+}
+// A class color used AS text: blended toward the theme's text color so it stays readable in light and dark.
+export function tone(color) {
+  return `color-mix(in srgb, ${color} 62%, var(--text))`;
+}

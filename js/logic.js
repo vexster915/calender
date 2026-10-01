@@ -53,6 +53,16 @@ export function emptyData() {
       longBreakMin: 15,
       dailyGoal: 30,
       newPerDay: 15,
+      // Focus & ADHD support
+      focusMode: true, // hide the sidebar while studying
+      breakMin: 25, // gentle break check-in every N minutes (0 = off)
+      chunk: 7, // cards per Learn round
+      sprintMin: 5, // "Just 5 minutes" sprint length
+      timeBuffer: false, // add 50% to estimates when planning
+      noise: 'brown',
+      comfortText: 'normal',
+      comfortSpacing: false,
+      calm: false,
     },
     classes: [],
     items: [],
@@ -62,6 +72,10 @@ export function emptyData() {
     sets: [],
     docs: [],
     courses: [],
+    inbox: [],
+    xp: 0,
+    freezes: 1,
+    frozen: [],
     studyLog: {},
   };
 }
@@ -98,7 +112,8 @@ export function sortByPriority(items, now = new Date()) {
 //  * Everything else is front-loaded onto your lightest days, so nothing piles up the night before.
 export function autoPlan(item, data, now = new Date()) {
   const keep = (item.plan || []).filter((s) => s.done);
-  const remaining = remainingMin(item);
+  // Optional ×1.5 buffer: most of us (ADHD brains especially) underestimate how long work takes.
+  const remaining = Math.round(remainingMin(item) * (data.settings.timeBuffer ? 1.5 : 1));
   if (!item.due || remaining <= 0) return keep;
 
   const sessionLen = data.settings.sessionMin || 45;
@@ -249,8 +264,9 @@ export function logActivity(data, when = new Date()) {
   if (data.activity.length > 800) data.activity = data.activity.slice(-800);
 }
 
+// Days covered by a streak freeze count as active (see focus.js) — streaks are forgiving.
 export function streak(data, now = new Date()) {
-  const set = new Set(data.activity);
+  const set = new Set([...data.activity, ...(data.frozen || [])]);
   let d = startOfDay(now);
   if (!set.has(dayKey(d))) d = addDays(d, -1);
   let n = 0;

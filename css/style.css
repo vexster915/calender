@@ -286,19 +286,19 @@ input[type='color'] {
 .chip.critical,
 .chip.overdue {
   background: rgba(255, 93, 115, 0.15);
-  color: var(--critical);
+  color: color-mix(in srgb, var(--critical) 50%, var(--text));
 }
 .chip.high {
   background: rgba(255, 159, 67, 0.15);
-  color: var(--high);
+  color: color-mix(in srgb, var(--high) 45%, var(--text));
 }
 .chip.steady {
   background: rgba(139, 108, 255, 0.15);
-  color: var(--steady);
+  color: color-mix(in srgb, var(--steady) 60%, var(--text));
 }
 .chip.chill {
   background: rgba(31, 200, 169, 0.15);
-  color: var(--chill);
+  color: color-mix(in srgb, var(--chill) 45%, var(--text));
 }
 .chip.cls {
   color: #fff;
@@ -361,6 +361,7 @@ input[type='color'] {
 
 /* ---------- auth ---------- */
 .auth {
+  display: grid;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -1156,7 +1157,12 @@ input[type='color'] {
   font-weight: 800;
   letter-spacing: 0.12em;
 }
-.class-card h4 {
+.class-card h4,
+.class-card h3.class-name {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  display: block;
   font-size: 1.2em;
   margin: 2px 0 8px;
 }
@@ -2114,6 +2120,9 @@ input[type='color'] {
 }
 .study-title {
   font-size: 1.05em;
+  font-weight: 400;
+  margin: 0;
+  letter-spacing: 0;
 }
 .study-body {
   display: flex;
@@ -2579,5 +2588,137 @@ kbd {
   }
   .topbar .btn.lock-label span {
     display: none;
+  }
+}
+
+/* ---------- focus & ADHD support ---------- */
+.stat b .freeze {
+  font-size: 0.6em;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.xp-bar {
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.xp-bar > div,
+.sprint-bar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-3));
+  transition: width 0.5s linear;
+}
+.next-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 16%, var(--panel)), var(--panel));
+}
+.next-icon {
+  font-size: 2.2em;
+  line-height: 1;
+}
+.next-label {
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.next-title {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.big-btn {
+  padding: 12px 20px;
+  font-size: 1.05em;
+}
+.park-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.park-row:first-of-type {
+  border-top: 0;
+}
+.session-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.sprint-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 8px 0 14px;
+}
+.btn.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.speak {
+  font-size: 0.95em;
+}
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.toggle-row .check {
+  margin-top: 2px;
+  flex: none;
+}
+/* Focus mode: only the study session on screen. */
+.shell.focus {
+  grid-template-columns: 1fr;
+}
+.shell.focus .sidebar,
+.shell.focus .topbar {
+  display: none;
+}
+.shell.focus .main {
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+}
+/* Comfort display */
+html[data-text='large'] body {
+  font-size: 17px;
+}
+html[data-text='xl'] body {
+  font-size: 19px;
+}
+html[data-spacing='relaxed'] body {
+  line-height: 1.75;
+  letter-spacing: 0.02em;
+  word-spacing: 0.08em;
+}
+html[data-calm='on'] *,
+html[data-calm='on'] *::before,
+html[data-calm='on'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-bar > div,
+  .sprint-bar > div {
+    transition: none;
   }
 }

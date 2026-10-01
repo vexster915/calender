@@ -406,6 +406,11 @@ export async function importBackup(backup, password) {
   }
   const rec = backup.account;
   const user = normalizeUsername(rec.username);
+  // A tampered file could ask for a tiny (weak) or enormous (browser-freezing) key-stretching count.
+  const okIter = (n) => Number.isInteger(n) && n >= 100000 && n <= 10000000;
+  if (!rec.kdf || !okIter(rec.kdf.iterations) || (rec.recKdf && !okIter(rec.recKdf.iterations)) || typeof rec.kdf.salt !== 'string') {
+    throw new Error('That backup file looks damaged or tampered with.');
+  }
   const kek = await deriveKek(password, unb64(rec.kdf.salt), rec.kdf.iterations);
   let raw;
   try {

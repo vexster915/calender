@@ -119,6 +119,8 @@ export function logStudy(data, { cards = 0, correct = 0, fresh = 0, minutes = 0 
   day.correct += correct;
   day.fresh += fresh;
   day.minutes += minutes;
+  // XP rewards effort (showing up and doing reps), not just being right.
+  data.xp = (data.xp || 0) + cards * 2 + correct + minutes;
 }
 export function studiedToday(data, now = new Date()) {
   return data.studyLog[dayKey(now)]?.cards || 0;
