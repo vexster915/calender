@@ -10,6 +10,7 @@ import * as vault from './vault.js';
 import { gallery, renderFiles, openSchedule } from './attach.js';
 import { renderHome, renderLibrary, renderSet, renderStudy, renderReviewHub, deleteSet } from './study.js';
 import { renderCourses, renderCourse } from './ap.js';
+import { renderCatalog, renderDvCourse } from './catalog.js';
 import { dueCount } from './srs.js';
 import { suggestSteps, addXP, applyComfort, stopNoise } from './focus.js';
 
@@ -1636,6 +1637,7 @@ function renderSettings(app) {
                 for (const set of [...app.data.sets]) await deleteSet(app, set);
                 app.data.docs = [];
                 app.data.courses = [];
+                app.data.dvCourses = [];
                 app.data.studyLog = {};
                 app.data.settings = settings;
                 app.commit();
@@ -1764,6 +1766,8 @@ export const VIEWS = {
   review: { label: 'Review', icon: '🧠', render: renderReviewHub, mobile: true, badge: (app) => dueCount(app.data) },
   courses: { label: 'AP & Courses', short: 'AP', icon: '🎓', render: renderCourses, mobile: false },
   course: { label: 'Course', icon: '🎓', render: renderCourse },
+  catalog: { label: 'Course catalog', icon: '🏫', render: renderCatalog },
+  dvcourse: { label: 'Course', icon: '🎒', render: renderDvCourse },
   planner: { label: 'Planner', icon: '🗓', render: renderPlanner, mobile: true },
   classes: { label: 'Classes', icon: '🎒', render: renderClasses, mobile: false },
   files: { label: 'Files', icon: '📎', render: (app) => renderFiles(app, pageTitle), mobile: false },

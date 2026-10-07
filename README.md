@@ -39,6 +39,30 @@ The catalog was checked line by line against the **2025–26 CEDs** for all 23 c
 
 **Regular classes:** your own PDFs come first. If you have none, the AP & Courses page suggests free, openly-licensed material for each class, such as an OpenStax textbook (downloadable PDF) and Khan Academy, which you can upload to make a study set.
 
+## O'Connor course catalog
+
+Every course offered at **Sandra Day O'Connor High School** (Deer Valley Unified School District, Phoenix AZ) is built in: 274 courses from the district's 2026-27 Academic Planning Guide, with grades, credits, prerequisites and the district's descriptions. Go to **AP & Courses → Course catalog**, check the classes you take, and Orbit sets each one up:
+
+- **AP courses** link to the full AP setup above (unchanged): official units, CED import, unit tests and practice exams.
+- **Other courses** get units, a learning-goal checklist and flashcards. The source is always labelled:
+  - **DVUSD guide**: units and outcomes from DVUSD's public curriculum guides (PE, Health, visual arts, theatre, dance, band, choir, Spanish 1-6), with a link to the guide.
+  - **Orbit outline**: where DVUSD's guide isn't public (the high school science and social studies guides need a district login), Orbit's outline is built from the course description and the Arizona standards the guide lists.
+  - **Your PDFs**: courses with no public curriculum start empty. Upload class handouts and Orbit makes the cards.
+- Upload PDFs to any unit to study exactly what your class covers.
+
+CTE courses that the guide doesn't list for O'Connor are flagged "check availability".
+
+## Bluebook-style practice exams
+
+Practice AP exams run in a full-screen interface modelled on the College Board's Bluebook app (all designs, text and formulas are Orbit's own):
+
+- A section header with **Directions**, a countdown timer you can **Hide** (it comes back with a warning at 5 minutes), and the tools **Highlights & Notes**, **Calculator** (scientific, in subjects that allow one, not on no-calculator parts), **Reference** (Orbit's formula lists) and **More** (Line Reader, Help, Pause & exit, Quit).
+- On each question: **Mark for Review** and the **ABC answer eliminator** to cross out choices.
+- **Question X of Y** opens the question navigator (current, unanswered and for-review markers). Every section ends with a **Check Your Work** page before you submit.
+- Sections submit automatically when time runs out, with a **break screen** between sections.
+- Free response opens in a **split screen** (prompt on one side, typed response on the other, with a word count and a resizable divider).
+- Keyboard: A–E select, Shift+A–E cross out, ←/→ move, Esc closes panels.
+
 ## Study games (built for ADHD brains)
 
 Studying should feel like playing. Every set with 4+ cards has two game modes, and Home has daily quests:
@@ -143,6 +167,12 @@ js/apparse.js       CED parser, multiple-choice/answer-key parser, FRQ splitter,
 vendor/pdfjs/       Mozilla pdf.js (Apache-2.0), bundled so no outside servers are contacted
 js/focus.js         ADHD/focus tools: next action, sprints, parking lot, XP + streak freezes, read-aloud, noise, comfort display
 js/games.js         Blitz, Boss battle, daily quests, loot, combos, sound effects
+js/catalog.js       O'Connor course catalog page, adding courses, catalog course pages
+js/dvcatalog.js     generated: SOHS courses from the DVUSD 2026-27 Academic Planning Guide
+js/dvoutcomes.js    generated: units/outcomes from DVUSD's public curriculum guides
+js/dvcurriculum.js  resolves each catalog course to its curriculum (DVUSD guide / Orbit outline / none)
+js/cur-*.js         Orbit study outlines + key terms (English & math, science & social studies, languages & CTE)
+js/bluebook.js      Bluebook-style exam interface: tools, navigator, review page, breaks, calculator
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
 js/files.js         IndexedDB storage + image compression

@@ -411,7 +411,7 @@ async function enter(session) {
   if (!data) data = emptyData();
   // Fill in any settings added in newer versions.
   data.settings = { ...emptyData().settings, ...data.settings };
-  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses', 'inbox', 'frozen']) data[key] ||= [];
+  for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses', 'dvCourses', 'inbox', 'frozen']) data[key] ||= [];
   delete data.meals; // removed feature
   data.xp ||= 0;
   applyFreezes(data);
@@ -441,7 +441,7 @@ function renderShell() {
   const keepQuick = activeEl?.id === 'quick-input' ? { value: activeEl.value, pos: activeEl.selectionStart } : null;
   clear(root);
 
-  const isOn = (id) => app.view === id || (id === 'library' && ['set', 'study'].includes(app.view)) || (id === 'courses' && app.view === 'course');
+  const isOn = (id) => app.view === id || (id === 'library' && ['set', 'study'].includes(app.view)) || (id === 'courses' && ['course', 'catalog', 'dvcourse'].includes(app.view));
   const navBtn = (id) => {
     const v = VIEWS[id];
     const badge = v.badge?.(app);
@@ -492,7 +492,9 @@ function renderShell() {
 
   // Focus mode: while studying, hide everything except the work.
   const focus = app.view === 'study' && app.data.settings.focusMode;
-  root.appendChild(el('div', { class: `shell${focus ? ' focus' : ''}` }, sidebar, main, mobileNav));
+  const examS = app.view === 'study' && app.viewState.study?.session;
+  const exam = examS?.mode === 'exam' && ['section', 'break'].includes(examS.phase);
+  root.appendChild(el('div', { class: `shell${focus ? ' focus' : ''}${exam ? ' exam' : ''}` }, sidebar, main, mobileNav));
 }
 
 function openMoreSheet(ids, isOn) {

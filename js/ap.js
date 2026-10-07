@@ -1,6 +1,6 @@
 // AP courses: official unit structure, CED import, AP Classroom material, unit tests and
 // full practice AP exams built on the real exam format.
-import { el, add, uid, fmtDate, clamp, tone, kbd } from './util.js';
+import { el, uid, fmtDate, clamp, tone, kbd } from './util.js';
 import { modal, confirmBox, toast, confetti } from './ui.js';
 import { AP_COURSES, courseByKey, unitLabel, weightMid, links, resourcesFor, TASK_VERBS } from './apcatalog.js';
 import { parseCED, cedCards, parseMCQ, splitFRQ, detectUnit } from './apparse.js';
@@ -9,6 +9,9 @@ import { generateCards } from './gen.js';
 import { newCard, grade, mastery, shuffle, logStudy } from './srs.js';
 import { orbitBar, ring, startStudy, wireFileDrop, pageTitle, setById, openCreateSet } from './study.js';
 import { logActivity, CLASS_COLORS } from './logic.js';
+import { catalogTiles } from './catalog.js';
+import { renderBluebook, renderBreak } from './bluebook.js';
+import { DV_SCHOOL, DV_COURSES } from './dvcatalog.js';
 
 const dec = new TextDecoder();
 const enc = new TextEncoder();
@@ -23,11 +26,23 @@ function extLink(label, url, title) {
 // ------------------------------------------------------------------ Courses hub
 export function renderCourses(app) {
   const mine = app.data.courses;
-  const regular = app.data.classes.filter((c) => !mine.some((m) => m.classId === c.id));
+  const dv = app.data.dvCourses || [];
+  const regular = app.data.classes.filter((c) => !mine.some((m) => m.classId === c.id) && !dv.some((m) => m.classId === c.id));
+  const catalogCard = el(
+    'div',
+    { class: 'card catalog-cta' },
+    el('div', { class: 'big' }, '🏫'),
+    el('div', { style: { flex: 1, minWidth: 0 } }, el('b', {}, `${DV_SCHOOL.short} course catalog`), el('div', { class: 'small muted' }, `All ${DV_COURSES.length} courses at ${DV_SCHOOL.name} (${DV_SCHOOL.district}, ${DV_SCHOOL.year}). Pick your classes and Orbit sets them up with the curriculum.`)),
+    el('button', { class: 'btn primary', onclick: () => app.go('catalog') }, dv.length || mine.length ? 'Browse catalog' : 'Pick my courses'),
+  );
   return el(
     'div',
     {},
-    pageTitle('AP & Courses', el('button', { class: 'btn primary', onclick: () => openAddCourse(app) }, '+ Add AP course')),
+    pageTitle('AP & Courses', el('button', { class: 'btn', onclick: () => app.go('catalog') }, '🏫 Course catalog'), el('button', { class: 'btn primary', onclick: () => openAddCourse(app) }, '+ Add AP course')),
+    catalogCard,
+    dv.length > 0 && el('div', { class: 'section-h', style: { margin: '16px 0 8px' } }, 'My O’Connor courses'),
+    dv.length > 0 && el('div', { class: 'set-grid big' }, catalogTiles(app)),
+    dv.length > 0 && el('div', { class: 'section-h', style: { margin: '16px 0 8px' } }, 'My AP courses'),
     mine.length
       ? el('div', { class: 'set-grid big' }, mine.map((c) => courseTile(app, c)))
       : el(
@@ -1070,111 +1085,39 @@ function fmtClock(ms) {
   return `${h ? `${h}:` : ''}${String(mm).padStart(h ? 2 : 1, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
-export function renderExam(app, s, top) {
+export function renderExam(app, s) {
   const course = courseById(app, s.courseId);
   const info = infoOf(course);
   if (s.phase === 'results') return renderResults(app, s, course, info);
   if (s.phase === 'score') return renderSelfScore(app, s, course, info);
 
   const sec = s.sections[s.sec];
-  if (s.timed && !s.secEnds) s.secEnds = Date.now() + sec.minutes * 60000;
   if (s.phase === 'break') {
-    return el(
-      'div',
-      { class: 'study-body' },
-      el(
-        'div',
-        { class: 'card summary' },
-        el('div', { class: 'big' }, '☕'),
-        el('h3', { style: { justifyContent: 'center' } }, `Section ${s.sec} done`),
-        el('div', { class: 'muted' }, `Next: ${sec.name} — ${sec.items.length} question${sec.items.length > 1 ? 's' : ''}, ${sec.minutes} minutes`),
-        el('button', { class: 'btn primary', style: { marginTop: '14px' }, onclick: () => ((s.phase = 'section'), (s.secEnds = s.timed ? Date.now() + sec.minutes * 60000 : null), app.render()) }, 'Start section ▶'),
-      ),
-    );
-  }
-
-  const clock = el('b', { class: 'match-clock exam-clock' }, s.timed ? fmtClock(s.secEnds - Date.now()) : 'untimed');
-  add(top, el('span', { class: 'muted small' }, `Section ${s.sec + 1} of ${s.sections.length}: ${sec.name}`), clock);
-  if (s.timed) {
-    clearInterval(s.timer);
-    s.timer = setInterval(() => {
-      if (app.viewState.study?.session !== s || s.phase !== 'section') return clearInterval(s.timer);
-      const left = s.secEnds - Date.now();
-      const c = document.querySelector('.exam-clock');
-      if (c) {
-        c.textContent = fmtClock(left);
-        c.classList.toggle('low', left < 5 * 60000);
-      }
-      if (left <= 0) {
-        clearInterval(s.timer);
-        toast('⏰ Time — section submitted');
-        nextSection(app, s);
-      }
-    }, 500);
-  }
-
-  const q = sec.items[s.q] ? s.q : 0;
-  const item = sec.items[q];
-  const nav = el(
-    'div',
-    { class: 'q-nav' },
-    sec.items.map((it, i) =>
-      el('button', { class: `q-dot${i === q ? ' on' : ''}${(sec.kind === 'mcq' ? it.given !== null : it.response.trim()) ? ' done' : ''}${it.flag ? ' flag' : ''}`, onclick: () => ((s.q = i), app.render()) }, String(i + 1)),
-    ),
-  );
-
-  let body;
-  if (sec.kind === 'mcq') {
-    body = el(
-      'div',
-      { class: 'card question' },
-      el('div', { class: 'row small muted' }, el('span', {}, `Question ${q + 1} of ${sec.items.length}`), el('span', { class: 'spacer' }), el('button', { class: `btn sm${item.flag ? ' primary' : ''}`, onclick: () => ((item.flag = !item.flag), app.render()) }, item.flag ? '⚑ Marked for review' : '⚐ Mark for review')),
-      el('div', { class: 'q-text small-q' }, item.stem),
-      el('div', { class: 'choices one-col' }, item.choices.map((ch, i) => el('button', { class: `choice${item.given === i ? ' picked' : ''}`, onclick: () => ((item.given = i), app.render()) }, el('span', { class: 'key' }, 'ABCDE'[i]), ch))),
-    );
-    s.keys = Object.fromEntries([
-      ...item.choices.map((_, i) => ['abcde'[i], () => ((item.given = i), app.render())]),
-      ...item.choices.map((_, i) => [String(i + 1), () => ((item.given = i), app.render())]),
-      ['ArrowRight', () => ((s.q = Math.min(sec.items.length - 1, q + 1)), app.render())],
-      ['ArrowLeft', () => ((s.q = Math.max(0, q - 1)), app.render())],
-    ]);
-  } else {
-    const ta = el('textarea', { rows: 14, class: 'frq-answer', placeholder: 'Write your response…' }, item.response);
-    ta.addEventListener('input', () => {
-      item.response = ta.value;
-      const d = document.querySelectorAll('.q-dot')[q];
-      d?.classList.toggle('done', !!ta.value.trim());
+    return renderBreak(app, s, {
+      fmtClock,
+      next: () => {
+        s.phase = 'section';
+        s.secEnds = s.timed ? Date.now() + sec.minutes * 60000 : null;
+        s.warned = false;
+        app.render();
+      },
     });
-    body = el('div', { class: 'card question' }, el('div', { class: 'row small muted' }, el('span', {}, `${sec.name} ${q + 1} of ${sec.items.length}`), item.unit !== null && item.unit !== undefined ? el('span', { class: 'chip' }, unitLabel(info, item.unit)) : null), el('div', { class: 'frq-prompt' }, item.prompt), ta);
-    s.keys = {};
   }
-
-  const unanswered = sec.items.filter((it) => (sec.kind === 'mcq' ? it.given === null : !it.response.trim())).length;
-  return el(
-    'div',
-    { class: 'study-body wide exam-body' },
-    sec.note && el('div', { class: 'small muted' }, sec.note),
-    nav,
-    body,
-    el(
-      'div',
-      { class: 'row' },
-      el('button', { class: 'btn', disabled: q === 0, onclick: () => ((s.q = q - 1), app.render()) }, '← Back'),
-      el('span', { class: 'spacer' }),
-      q < sec.items.length - 1 && el('button', { class: 'btn', onclick: () => ((s.q = q + 1), app.render()) }, 'Next →'),
-      el(
-        'button',
-        {
-          class: 'btn primary',
-          onclick: async () => {
-            if (unanswered && !(await confirmBox(`${unanswered} question${unanswered > 1 ? 's' : ''} unanswered in this section. Submit anyway?`, { ok: 'Submit section' }))) return;
-            nextSection(app, s);
-          },
-        },
-        s.sec < s.sections.length - 1 ? 'Submit section' : 'Finish exam',
-      ),
-    ),
-  );
+  if (s.timed && !s.secEnds) s.secEnds = Date.now() + sec.minutes * 60000;
+  return renderBluebook(app, s, {
+    info,
+    fmtClock,
+    user: app.session?.username || '',
+    submitSection: () => nextSection(app, s),
+    // Pause keeps the session (resume from the course page); the section clock keeps running, like the real thing.
+    pauseExam: () => app.go('course', { id: course.id }),
+    exitExam: async () => {
+      if (!(await confirmBox('Quit this exam? Your answers will be lost.', { ok: 'Quit exam', danger: true }))) return;
+      clearInterval(s.timer);
+      app.viewState.study = null;
+      app.go('course', { id: course.id });
+    },
+  });
 }
 
 function nextSection(app, s) {

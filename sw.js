@@ -1,6 +1,6 @@
 // Offline support. Network-first so updates show up right away; cache is the fallback.
 // Only the app's own static files are cached — your planner data lives encrypted in IndexedDB, never here.
-const CACHE = 'orbit-v9';
+const CACHE = 'orbit-v11';
 const ASSETS = [
   './',
   'index.html',
@@ -24,6 +24,14 @@ const ASSETS = [
   'js/aptopics.js',
   'js/focus.js',
   'js/games.js',
+  'js/catalog.js',
+  'js/bluebook.js',
+  'js/dvcatalog.js',
+  'js/dvcurriculum.js',
+  'js/dvoutcomes.js',
+  'js/cur-ela-math.js',
+  'js/cur-sci-ss.js',
+  'js/cur-lang-cte.js',
   'vendor/pdfjs/pdf.min.mjs',
   'vendor/pdfjs/pdf.worker.min.mjs',
   'icons/icon.svg',

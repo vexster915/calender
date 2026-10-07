@@ -398,7 +398,8 @@ export function renderSet(app) {
   body = el('div', {}, body, st.tab === 'cards' && questionBank(app, set));
 
   const course = courseForSet(app, set);
-  return el('div', { class: 'set-page' }, course && el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px', marginBottom: '4px' }, onclick: () => app.go('course', { id: course.id, tab: 'units' }) }, '🎓 Back to course'), header, modes, el('div', { class: 'card', style: { marginBottom: '16px' } }, orbitBar(set, { tall: true }), orbitLegend), el('div', { class: 'row', style: { marginBottom: '12px' } }, tabs), body);
+  const dvBack = set.dvCourseId && el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px', marginBottom: '4px' }, onclick: () => app.go('dvcourse', { id: set.dvCourseId, tab: 'units' }) }, '🎒 Back to course');
+  return el('div', { class: 'set-page' }, dvBack, course && el('button', { class: 'btn sm ghost', style: { marginLeft: '-10px', marginBottom: '4px' }, onclick: () => app.go('course', { id: course.id, tab: 'units' }) }, '🎓 Back to course'), header, modes, el('div', { class: 'card', style: { marginBottom: '16px' } }, orbitBar(set, { tall: true }), orbitLegend), el('div', { class: 'row', style: { marginBottom: '12px' } }, tabs), body);
 }
 
 function cardList(app, set, st) {
@@ -930,6 +931,8 @@ export function renderStudy(app) {
     app.view = 'home';
     return renderHome(app);
   }
+  // Practice exams take over the whole screen with the Bluebook-style interface.
+  if (s.mode === 'exam' && ['section', 'break'].includes(s.phase)) return renderExam(app, s);
   const set = s.setId && setById(app, s.setId);
   const titles = { cards: 'Flashcards', learn: 'Learn', test: 'Test', match: 'Match', review: 'Review', blitz: 'Blitz', boss: 'Boss battle', exam: s.kind === 'unit' ? 'Unit test' : 'Practice exam' };
   const back = async () => {
@@ -953,7 +956,7 @@ export function renderStudy(app) {
   else if (s.mode === 'match') body = renderMatch(app, s, set, top);
   else if (s.mode === 'review') body = renderReview(app, s, top);
   else if (s.mode === 'test') body = renderTest(app, s, set, top);
-  else if (s.mode === 'exam') body = renderExam(app, s, top);
+  else if (s.mode === 'exam') body = renderExam(app, s);
   else if (s.mode === 'blitz' || s.mode === 'boss') {
     const finish = (o) => finishSession(app, s, o);
     const gameSummary = ({ big, line, details, missed }) =>

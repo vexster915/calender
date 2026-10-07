@@ -74,6 +74,7 @@ export function emptyData() {
     docs: [],
     courses: [],
     inbox: [],
+    dvCourses: [],
     xp: 0,
     freezes: 1,
     frozen: [],
