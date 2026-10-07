@@ -2087,13 +2087,13 @@ input[type='color'] {
 }
 .topic-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 4px 16px;
   margin-top: 6px;
 }
 .topic {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 0.86em;
   padding: 3px 0;
@@ -2107,6 +2107,19 @@ input[type='color'] {
 .topic.done span {
   color: var(--faint);
   text-decoration: line-through;
+}
+@media (max-width: 760px) {
+  .unit-row {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .unit-row > .row {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .topic-panel {
+    padding-left: 16px;
+  }
 }
 
 /* study session */
@@ -3510,6 +3523,10 @@ body:has(.modal-back) {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: color-mix(in srgb, var(--accent) 55%, var(--text));
 }
+.chip.src-standards {
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+  color: color-mix(in srgb, var(--accent-2) 50%, var(--text));
+}
 .chip.added-chip {
   background: color-mix(in srgb, var(--accent-3) 22%, transparent);
   color: var(--text);
@@ -3538,6 +3555,14 @@ body:has(.modal-back) {
 }
 .src-note.src-dvusd {
   border-color: color-mix(in srgb, var(--accent-3) 45%, var(--line));
+}
+.src-note.src-standards {
+  border-color: color-mix(in srgb, var(--accent-2) 45%, var(--line));
+}
+.src-note .btn {
+  white-space: normal;
+  text-align: left;
+  height: auto;
 }
 @media (max-width: 760px) {
   .cat-main {

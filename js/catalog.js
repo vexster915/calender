@@ -18,6 +18,7 @@ const colorOf = (c) => DEPT_COLORS[c.dept] || '#8a84b3';
 const SOURCE = {
   dvusd: ['DVUSD guide', 'Units and outcomes from DVUSD’s own curriculum guide'],
   orbit: ['Orbit outline', 'Orbit’s study outline (DVUSD doesn’t publish a public guide for this course)'],
+  standards: ['Standards plan', 'Study plan built from published standards (DVUSD doesn’t publish a public guide for this course)'],
   none: ['Your PDFs', 'No public curriculum. Study from the description and the PDFs you upload'],
 };
 
@@ -49,15 +50,72 @@ function createDvCourse(app, c) {
   const cls = { id: uid(), name: c.title, code, color: colorOf(c) || CLASS_COLORS[app.data.classes.length % CLASS_COLORS.length], teacher: '', room: '', meetings: [] };
   app.data.classes.push(cls);
   const cur = curriculumFor(c);
-  const course = { id: uid(), cid: c.id, classId: cls.id, createdAt: new Date().toISOString(), unitSets: [], covered: {} };
+  const course = { id: uid(), cid: c.id, classId: cls.id, createdAt: new Date().toISOString(), unitSets: [], covered: {}, curSig: curSig(cur) };
   const units = cur.units.length ? cur.units : [{ title: 'Class notes & handouts', topics: [], terms: [] }];
   units.forEach((unit, i) => {
-    const set = { id: uid(), title: `${c.title} · ${unit.title}`, classId: cls.id, dvCourseId: course.id, unit: i, description: cur.source === 'none' ? 'Upload your class PDFs or notes to make cards.' : `${SOURCE[cur.source][0]} · ${unit.topics.length} learning goals`, createdAt: new Date().toISOString(), lastStudied: null, cards: unit.terms.map(([t, d]) => newCard(t, d, 'def')), questions: [], docIds: [], keyPoints: unit.topics.slice(), topics: [], bestMatchMs: null, tests: [] };
+    const set = unitSet(c, course, cur, unit, i);
     app.data.sets.push(set);
     course.unitSets.push(set.id);
   });
   app.data.dvCourses.push(course);
   return course;
+}
+
+const unitDesc = (cur, unit) => (cur.source === 'none' ? 'Upload your class PDFs or notes to make cards.' : `${SOURCE[cur.source][0]} · ${unit.topics.length} learning goals`);
+const curSig = (cur) => cur.units.map((u) => `${u.title}|${u.topics.length}|${u.terms.length}`).join('~');
+function unitSet(c, course, cur, unit, i) {
+  return { id: uid(), title: `${c.title} · ${unit.title}`, classId: course.classId, dvCourseId: course.id, unit: i, description: unitDesc(cur, unit), createdAt: new Date().toISOString(), lastStudied: null, cards: unit.terms.map(([t, d]) => newCard(t, d, 'def')), questions: [], docIds: [], keyPoints: unit.topics.slice(), topics: [], bestMatchMs: null, tests: [] };
+}
+
+// When a course's curriculum gets deeper (new units, goals or terms), bring courses students already
+// added up to date without losing anything: units are matched by title, missing cards and goals are
+// added, checked-off goals stay checked, and units no longer in the plan are kept at the end.
+export function syncDvCourses(data) {
+  let changed = false;
+  for (const course of data.dvCourses || []) {
+    const c = catalogCourse(course.cid);
+    if (!c) continue;
+    const cur = curriculumFor(c);
+    const sig = curSig(cur);
+    if (course.curSig === sig) continue;
+    course.curSig = sig;
+    changed = true;
+    if (!cur.units.length) continue;
+    const oldSets = course.unitSets.map((id) => data.sets.find((x) => x.id === id) || null);
+    const oldGoals = oldSets.map((x) => (x ? (x.keyPoints || []).slice() : []));
+    const used = new Set();
+    const order = cur.units.map((unit, n) => {
+      const k = oldSets.findIndex((x, j) => x && !used.has(j) && x.title === `${c.title} · ${unit.title}`);
+      if (k < 0) {
+        const set = unitSet(c, course, cur, unit, n);
+        data.sets.push(set);
+        return { set, from: -1 };
+      }
+      used.add(k);
+      const set = oldSets[k];
+      const fronts = new Set(set.cards.map((x) => String(x.term || '').trim().toLowerCase()));
+      for (const [t, d] of unit.terms) if (!fronts.has(t.trim().toLowerCase())) set.cards.push(newCard(t, d, 'def'));
+      const goals = unit.topics.slice();
+      for (const g of set.keyPoints || []) if (!goals.includes(g)) goals.push(g);
+      set.keyPoints = goals;
+      set.description = unitDesc(cur, unit);
+      return { set, from: k };
+    });
+    oldSets.forEach((x, j) => x && !used.has(j) && order.push({ set: x, from: j }));
+    const covered = {};
+    order.forEach(({ set, from }, n) => {
+      set.unit = n;
+      if (from < 0) return;
+      oldGoals[from].forEach((g, k) => {
+        if (!course.covered?.[`${from}:${k}`]) return;
+        const k2 = set.keyPoints.indexOf(g);
+        if (k2 >= 0) covered[`${n}:${k2}`] = true;
+      });
+    });
+    course.covered = covered;
+    course.unitSets = order.map((x) => x.set.id);
+  }
+  return changed;
 }
 
 // ------------------------------------------------------------------ catalog page
@@ -133,7 +191,7 @@ export function renderCatalog(app) {
           c.ap
             ? el('div', { class: 'small' }, `Adds the full ${courseByKey(c.ap)?.name || 'AP'} course: official units, CED import, unit tests and Bluebook-style practice exams.`)
             : cur.units.length
-              ? el('div', { class: 'cat-units' }, el('div', { class: 'section-h' }, `${cur.units.length} units · ${SOURCE[cur.source][1]}`), el('ol', {}, cur.units.map((x) => el('li', {}, x.title, el('span', { class: 'faint' }, ` · ${x.topics.length ? `${x.topics.length} goal${x.topics.length === 1 ? '' : 's'}` : ''}${x.topics.length && x.terms.length ? ', ' : ''}${x.terms.length ? `${x.terms.length} cards` : ''}`)))))
+              ? el('div', { class: 'cat-units' }, el('div', { class: 'section-h' }, `${cur.units.length} units · ${SOURCE[cur.source][1]}`), cur.sources && el('div', { class: 'small muted' }, `Built from: ${cur.sources.map((x) => x.name).join(' · ')}`), el('ol', {}, cur.units.map((x) => el('li', {}, x.title, el('span', { class: 'faint' }, ` · ${x.topics.length ? `${x.topics.length} goal${x.topics.length === 1 ? '' : 's'}` : ''}${x.topics.length && x.terms.length ? ', ' : ''}${x.terms.length ? `${x.terms.length} cards` : ''}`)))))
               : el('div', { class: 'small muted' }, 'No public curriculum for this course. Add it, then upload your class PDFs to make cards.'),
         ),
     );
@@ -219,7 +277,7 @@ export function renderDvCourse(app) {
   const live = sets.filter(Boolean);
   const allCards = live.reduce((n, s) => n + s.cards.length, 0);
   const covered = (course.covered ||= {});
-  const open = (st.open ||= {});
+  const open = ((st.openBy ||= {})[course.id] ||= {}); // expanded units, per course
   const header = el(
     'div',
     { class: 'set-header' },
@@ -233,12 +291,23 @@ export function renderDvCourse(app) {
     ),
     el('div', { style: { textAlign: 'center' } }, ring(readiness(app, course), colorOf(c), 92), el('div', { class: 'small muted' }, 'mastery')),
   );
+  const NOTE = {
+    dvusd: ['📗 From DVUSD’s curriculum guide', `Units and learning goals come from “${cur.sourceName}”.`],
+    orbit: ['🧭 Orbit study outline', `DVUSD doesn’t publish this course’s curriculum publicly${/Science|Social Studies/.test(c.dept) ? ' (its high school guides for this department are staff-only)' : ''}, so Orbit built an outline from the course description${cur.standards && /Arizona/.test(cur.standards) ? ` and the ${cur.standards}` : ''}. Your teacher’s order may differ. Upload class handouts to make it match.`],
+    standards: ['📐 Built from published standards', `DVUSD doesn’t publish this course’s curriculum publicly${/Science|Social Studies/.test(c.dept) ? ' (its high school guides for this department are staff-only)' : ''}, so Orbit built the study plan from the standards below. Goals tagged “AZ …” come from the Arizona standard with that code; AP and national frameworks are paraphrased. Key terms are Orbit’s own. Your teacher’s order may differ, so upload class handouts to make it match.`],
+    none: ['📄 Study from your own material', 'DVUSD has no public curriculum for this course. Upload class PDFs, notes or study guides and Orbit makes the cards.'],
+  }[cur.source];
   const srcNote = el(
     'div',
     { class: `card src-note src-${cur.source}` },
-    el('b', {}, cur.source === 'dvusd' ? '📗 From DVUSD’s curriculum guide' : cur.source === 'orbit' ? '🧭 Orbit study outline' : '📄 Study from your own material'),
-    el('div', { class: 'small muted' }, cur.source === 'dvusd' ? `Units and learning goals come from “${cur.sourceName}”.` : cur.source === 'orbit' ? `DVUSD doesn’t publish this course’s curriculum publicly${/Science|Social Studies/.test(c.dept) ? ' (its high school guides for this department are staff-only)' : ''}, so Orbit built an outline from the course description${cur.standards && /Arizona/.test(cur.standards) ? ` and the ${cur.standards}` : ''}. Your teacher’s order may differ. Upload class handouts to make it match.` : 'DVUSD has no public curriculum for this course. Upload class PDFs, notes or study guides and Orbit makes the cards.'),
-    el('div', { class: 'row wrap', style: { marginTop: '6px' } }, cur.sourceUrl && extLink('Open the DVUSD guide', cur.sourceUrl), extLink('Course description (planning guide)', DV_SCHOOL.guide)),
+    el('b', {}, NOTE[0]),
+    el('div', { class: 'small muted' }, NOTE[1]),
+    el(
+      'div',
+      { class: 'row wrap', style: { marginTop: '6px' } },
+      cur.source === 'standards' ? cur.sources.map((x) => extLink(x.name, x.url, 'Opens the standards in a new tab')) : cur.sourceUrl && extLink('Open the DVUSD guide', cur.sourceUrl),
+      extLink('Course description (planning guide)', DV_SCHOOL.guide),
+    ),
   );
   const actions = el(
     'div',

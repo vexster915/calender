@@ -7,6 +7,7 @@ import { closeModal, modalOpen, modal, toast, logo, confetti } from './ui.js';
 import { forgetImages, uploadFiles } from './attach.js';
 import { VIEWS, NAV_ORDER, NAV_GROUPS, PLANNER_TABS, openItemEditor, openHelp } from './views.js';
 import { studyKey, startStudy, quickGame } from './study.js';
+import { syncDvCourses } from './catalog.js';
 import { applyComfort, applyFreezes, levelOf, streakWithFreezes, earnFreezes, openParkingLot, startSprint, stopNoise, addXP } from './focus.js';
 
 const root = document.getElementById('root');
@@ -413,6 +414,7 @@ async function enter(session) {
   data.settings = { ...emptyData().settings, ...data.settings };
   for (const key of ['classes', 'items', 'focusLog', 'activity', 'attachments', 'sets', 'docs', 'courses', 'dvCourses', 'inbox', 'frozen']) data[key] ||= [];
   delete data.meals; // removed feature
+  syncDvCourses(data); // pick up deeper catalog curricula
   data.xp ||= 0;
   applyFreezes(data);
   data.studyLog ||= {};

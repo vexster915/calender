@@ -46,9 +46,16 @@ Every course offered at **Sandra Day O'Connor High School** (Deer Valley Unified
 - **AP courses** link to the full AP setup above (unchanged): official units, CED import, unit tests and practice exams.
 - **Other courses** get units, a learning-goal checklist and flashcards. The source is always labelled:
   - **DVUSD guide**: units and outcomes from DVUSD's public curriculum guides (PE, Health, visual arts, theatre, dance, band, choir, Spanish 1-6), with a link to the guide.
-  - **Orbit outline**: where DVUSD's guide isn't public (the high school science and social studies guides need a district login), Orbit's outline is built from the course description and the Arizona standards the guide lists.
-  - **Your PDFs**: courses with no public curriculum start empty. Upload class handouts and Orbit makes the cards.
+  - **Standards plan**: where DVUSD's guide isn't public (for example, the high school science and social studies guides need a district login), the study plan is built from published standards and linked on the course page:
+    - Arizona's academic standards: ELA, math, science, history & social science, world languages, English language proficiency, computer science, educational technology, music, and student leadership.
+    - Arizona's CTE program standards for every CTE program, plus the CTE professional skills standards.
+    - College Board course frameworks for AP Seminar, AP Research, AP Music Theory, AP French, AP Chinese, AP Spanish Language and AP Spanish Literature (unit titles only; goals are paraphrased).
+    - National frameworks (ASCA, CASEL, the APA and ASA high school standards, the Learning Scientists, USAD's 2026–27 Academic Decathlon curriculum and others).
+
+    Goals tagged "AZ …" come from the Arizona standard with that code. Key terms are Orbit's own.
+  - **Orbit outline**: a few remaining courses use Orbit's outline, built from the course description.
 - Upload PDFs to any unit to study exactly what your class covers.
+- When a course's plan gets deeper in an update, courses you already added pick up the new units, goals and cards automatically. Your card progress, checked goals and uploads are kept, and units that are no longer in the plan stay at the end.
 
 CTE courses that the guide doesn't list for O'Connor are flagged "check availability".
 
@@ -170,8 +177,13 @@ js/games.js         Blitz, Boss battle, daily quests, loot, combos, sound effect
 js/catalog.js       O'Connor course catalog page, adding courses, catalog course pages
 js/dvcatalog.js     generated: SOHS courses from the DVUSD 2026-27 Academic Planning Guide
 js/dvoutcomes.js    generated: units/outcomes from DVUSD's public curriculum guides
-js/dvcurriculum.js  resolves each catalog course to its curriculum (DVUSD guide / Orbit outline / none)
+js/dvcurriculum.js  resolves each catalog course to its curriculum (DVUSD guide / standards plan / Orbit outline)
 js/cur-*.js         Orbit study outlines + key terms (English & math, science & social studies, languages & CTE)
+js/cur-deep*.js     standards-based study plans (CTE, AP Capstone, music, electives, ELD, world languages)
+js/cur-augment.js   standards goals and extra key terms layered onto the Orbit outlines
+js/azstandards.js   generated: Arizona standards (code, text, heading) used as learning goals
+js/terms-cte.js     key terms for each Arizona CTE program standard
+js/stdkit.js        helpers that turn standards into units, goals and cited sources
 js/bluebook.js      Bluebook-style exam interface: tools, navigator, review page, breaks, calculator
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
