@@ -12,7 +12,7 @@ import { logActivity, CLASS_COLORS } from './logic.js';
 import { catalogTiles } from './catalog.js';
 import { renderBluebook, renderBreak } from './bluebook.js';
 import { DV_SCHOOL, DV_COURSES } from './dvcatalog.js';
-import { renderRoad, buildRoad, roadInputs } from './road5.js';
+import { renderRoad, buildRoad, roadInputs, planStart } from './road5.js';
 
 const dec = new TextDecoder();
 const enc = new TextEncoder();
@@ -311,7 +311,7 @@ function roadActions(app, course, info, apExam) {
 function roadToPlanner(app, course, info, apExam) {
   const act = roadActions(app, course, info, apExam);
   const { road, mastery: m, tests, weakest, examDate } = roadInputs(app, course, info, act, apExam);
-  const plan = buildRoad(info, { examDate, currentUnit: road.currentUnit, intensity: road.intensity, mastery: m, tests, weakest });
+  const plan = buildRoad(info, { now: planStart(road, examDate), examDate, currentUnit: road.currentUnit, intensity: road.intensity, mastery: m, tests, weakest });
   const horizon = Date.now() + 28 * 86400000;
   app.data.items = app.data.items.filter((i) => !(i.apPlan === course.id && !i.done));
   const added = [];

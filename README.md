@@ -50,10 +50,11 @@ Every AP course opens on **🏆 Road to a 5**: a week-by-week plan from today to
   - 🏁 **Exam practice** (last month): a full timed practice exam every week, then your mistakes and weakest units.
   - 🎯 **Exam week:** light review, timing and logistics.
 - **Fits the school year.** Winter break becomes catch-up time with no new units, and June/July weeks are optional summer prep. On a short runway it still covers every unit and warns you when a week needs more than your chosen pace.
+- **Keeps pace with your class.** The plan is anchored to the day you set it up, so it moves through the units week by week and shows which unit your class should be on. If your class is ahead or behind, change it and the plan re-paces. An on-track check looks at the last three weeks, and unit tests, practice exams and reviews you missed carry over into this week's catch-up list.
 - **This week** lists each task with a button that starts it: Learn, unit test, FRQ drill, practice exam, Study my mistakes or the review queue. Tasks tick themselves off when you do them in Orbit, and you can tick anything by hand.
 - **Official topics** for each unit (from the CED) open from the task, with the same "covered" checkboxes as the Units tab.
 - **Review videos** for every unit: the College Board's AP Daily (in AP Classroom) and AP Daily: Live Review, plus the channels students rely on for each course (Heimler's History, Bozeman Science, Flipping Physics, Jacob Clifford, Mr. Sinn, The Organic Chemistry Tutor, Stats Medic and others) and Khan Academy. Links are searches, so they never go stale.
-- **What a 5 takes:** checkpoints (every unit learned and tested, 80%+ unit tests, three full practice exams, 72%+ on one), your latest estimated score, and subject-specific strategy (rubrics, FRQ habits, what to memorize).
+- **What a 5 takes:** checkpoints (every unit learned and tested, 80%+ unit tests, three full practice exams, 72%+ on one), your latest estimated score with a practice-exam trend line against the 5 target, and subject-specific strategy (rubrics, FRQ habits, what to memorize).
 - **🗓 Put the next 4 weeks in my Planner** adds the sessions to your calendar.
 - **Free-response drills** (one timed FRQ, rotating through the exam's FRQ types) are also on the Practice exams tab.
 

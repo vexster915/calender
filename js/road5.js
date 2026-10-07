@@ -355,6 +355,13 @@ export const videoList = (items) => el('ul', { class: 'video-list' }, items.map(
 const KIND_ICON = { learn: '🌱', video: '▶', unittest: '📝', review: '🔁', frq: '✍️', full: '🏁', half: '⏱', mcq: '🔘', mistakes: '🩹', videoall: '📺', daily: '🧠', skills: '🧾', logistics: '🎒' };
 const PHASE_COLOR = { learn: '#43d17a', review: '#3aa0ff', exam: '#ff7a45', final: '#ff6b8b' };
 
+// The plan is anchored to when the student told us where their class was, so the class keeps moving
+// through units week by week and past weeks keep their history. (Re-saving settings re-anchors it.)
+export function planStart(road, examDate) {
+  const t = road.setAt ? new Date(road.setAt) : new Date();
+  return t > new Date() || t < new Date(new Date(examDate).getTime() - 330 * DAY) ? new Date() : t;
+}
+
 export function roadInputs(app, course, info, act, apExam) {
   const road = (course.road ||= { intensity: 'steady', currentUnit: null, done: {} });
   const mastery = info.units.map((_, i) => {
@@ -373,12 +380,16 @@ export function renderRoad(app, course, info, act, apExam) {
   const { road, mastery, tests, weakest, examDate, estimated } = roadInputs(app, course, info, act, apExam);
   const st = (app.viewState.road ||= {});
   const setup = road.currentUnit === null || st.editing;
-  const settings = settingsCard(app, course, info, road, act, examDate, estimated, setup);
-  if (road.currentUnit === null) return el('div', { class: 'road' }, intro(info), settings, videosCard(info, st, app), strategyCard(info));
-  const plan = buildRoad(info, { examDate, currentUnit: road.currentUnit, intensity: road.intensity, mastery, tests, weakest });
+  if (road.currentUnit === null) return el('div', { class: 'road' }, intro(info), settingsCard(app, course, info, road, act, examDate, estimated, setup, null), videosCard(info, st, app), strategyCard(info));
+  const plan = buildRoad(info, { now: planStart(road, examDate), examDate, currentUnit: road.currentUnit, intensity: road.intensity, mastery, tests, weakest });
   const isDone = (t, wk) => road.done[t.id] ?? autoDone(t, wk, course, act.setOf);
   const today = new Date();
   const thisWeek = plan.weeks.find((w) => today >= w.start && today < new Date(w.end.getTime() + DAY)) || plan.weeks[0];
+  // Where the class should be now, given the pace set up (the unit being learned this week).
+  const learning = thisWeek.tasks.find((t) => t.kind === 'learn')?.unit;
+  const doneTeaching = plan.weeks.slice(0, plan.weeks.indexOf(thisWeek) + 1).flatMap((w) => w.tasks).filter((t) => t.kind === 'learn').map((t) => t.unit);
+  const nowUnit = learning ?? (doneTeaching.length && Math.max(...doneTeaching) >= info.units.length - 1 ? info.units.length : Math.max(road.currentUnit, ...doneTeaching.map((u) => u + 1)));
+  const settings = settingsCard(app, course, info, road, act, examDate, estimated, setup, Math.min(nowUnit, info.units.length));
   const daysLeft = Math.max(0, Math.ceil((new Date(examDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / DAY));
 
   const header = el(
@@ -389,11 +400,25 @@ export function renderRoad(app, course, info, act, apExam) {
     plan.weeks.some((w) => w.over) && el('div', { class: 'small road-warn', role: 'note' }, `⚠️ Short on time: to cover every unit, ${plan.weeks.filter((w) => w.over).length} week${plan.weeks.filter((w) => w.over).length === 1 ? ' needs' : 's need'} more than your chosen pace (up to ${Math.round(Math.max(...plan.weeks.map((w) => w.over)) / 6) / 10} h). Pick a faster pace in Plan settings if you can.`),
     el('div', { class: 'road-phases' }, plan.phases.map((p) => el('div', { class: `road-phase${p.key === thisWeek.phase ? ' on' : ''}`, style: { '--pc': PHASE_COLOR[p.key] } }, el('b', {}, `${p.icon} ${p.name}`), el('div', { class: 'small muted' }, `${md(p.from)} – ${md(p.to)} · ${p.weeks} wk`), el('div', { class: 'small' }, p.about)))),
   );
+  // How the last few weeks went, and important tasks from them that are still undone.
+  const idx = plan.weeks.indexOf(thisWeek);
+  const past = plan.weeks.slice(Math.max(0, idx - 3), idx).filter((w) => !w.summer);
+  const pastTasks = past.flatMap((w) => w.tasks.map((t) => [t, w]));
+  const rate = pastTasks.length ? pastTasks.filter(([t, w]) => isDone(t, w)).length / pastTasks.length : null;
+  const carry = plan.weeks
+    .slice(0, idx)
+    .flatMap((w) => w.tasks.map((t) => [t, w]))
+    .filter(([t, w]) => ['unittest', 'full', 'half', 'review'].includes(t.kind) && !isDone(t, w) && !thisWeek.tasks.some((x) => x.kind === t.kind && x.unit === t.unit))
+    .filter(([t], k, arr) => arr.findIndex(([x]) => x.kind === t.kind && x.unit === t.unit) === k)
+    .reverse()
+    .slice(0, 3);
+  const verdict = rate === null ? null : rate >= 0.7 ? ['✅ On track', `You finished ${Math.round(rate * 100)}% of the last ${past.length} week${past.length === 1 ? '' : 's'}’ tasks. Keep going.`] : rate >= 0.4 ? ['🟡 Slightly behind', `${Math.round(rate * 100)}% of recent tasks done. Clear the catch-up list below this week.`] : ['🔴 Behind', `${Math.round(rate * 100)}% of recent tasks done. Do the catch-up list first, and consider a faster pace in Plan settings.`];
   return el(
     'div',
     { class: 'road dash' },
     header,
-    weekCard(app, course, info, act, thisWeek, isDone, road, st, true),
+    verdict && el('div', { class: 'card wide road-verdict' }, el('b', {}, verdict[0]), el('span', { class: 'small muted' }, ` ${verdict[1]}`)),
+    weekCard(app, course, info, act, thisWeek, isDone, road, st, true, carry),
     scoreCard(course, info, mastery, tests),
     settings,
     timeline(app, course, info, act, plan, thisWeek, isDone, road, st),
@@ -412,20 +437,22 @@ function intro(info) {
   );
 }
 
-function settingsCard(app, course, info, road, act, examDate, estimated, open) {
+function settingsCard(app, course, info, road, act, examDate, estimated, open, nowUnit) {
+  const at = nowUnit ?? road.currentUnit ?? 0;
   const st = (app.viewState.road ||= {});
   if (!open) {
     return el(
       'div',
       { class: 'card road-settings' },
       el('h3', {}, '⚙️ Plan settings'),
-      el('div', { class: 'small' }, `Class is on: ${road.currentUnit >= info.units.length ? 'all units covered' : `${unitLabel(info, road.currentUnit)} — ${info.units[road.currentUnit].title}`}`),
+      el('div', { class: 'small' }, `Your class should be on: ${at >= info.units.length ? 'all units covered' : `${unitLabel(info, at)} — ${info.units[at].title}`}`),
+      el('div', { class: 'small muted' }, 'Ahead or behind? Tap Change and pick the unit your class is really on. The plan re-paces from there.'),
       el('div', { class: 'small' }, `Pace: ${INTENSITY[road.intensity].label} (${INTENSITY[road.intensity].hint})`),
       el('div', { class: 'small' }, `Exam: ${examDate.toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}${estimated ? ' — estimated' : ''}`),
       el('div', { class: 'row wrap', style: { marginTop: '8px' } }, el('button', { class: 'btn sm', onclick: () => ((st.editing = true), app.render()) }, 'Change'), estimated && el('button', { class: 'btn sm', onclick: () => act.setDate() }, '📅 Set my exam date'), el('button', { class: 'btn sm primary', onclick: () => act.planner() }, '🗓 Put the next 4 weeks in my Planner')),
     );
   }
-  const unitSel = el('select', { 'aria-label': 'Where your class is now' }, [...info.units.map((u, i) => el('option', { value: String(i), selected: (road.currentUnit ?? 0) === i }, `${unitLabel(info, i)} — ${u.title}`)), el('option', { value: String(info.units.length), selected: road.currentUnit === info.units.length }, 'We’ve covered every unit')]);
+  const unitSel = el('select', { 'aria-label': 'Where your class is now' }, [...info.units.map((u, i) => el('option', { value: String(i), selected: at === i }, `${unitLabel(info, i)} — ${u.title}`)), el('option', { value: String(info.units.length), selected: at >= info.units.length }, 'We’ve covered every unit')]);
   let inten = road.intensity || 'steady';
   const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Weekly study time' });
   const paint = () => {
@@ -444,7 +471,7 @@ function settingsCard(app, course, info, road, act, examDate, estimated, open) {
       { class: 'row', style: { marginTop: '12px' } },
       el('span', { class: 'spacer' }),
       road.currentUnit !== null && el('button', { class: 'btn', onclick: () => ((st.editing = false), app.render()) }, 'Cancel'),
-      el('button', { class: 'btn primary', onclick: () => { road.currentUnit = parseInt(unitSel.value, 10); road.intensity = inten; st.editing = false; app.commit(); } }, road.currentUnit === null ? 'Build my road to a 5' : 'Save'),
+      el('button', { class: 'btn primary', onclick: () => { road.currentUnit = parseInt(unitSel.value, 10); road.intensity = inten; road.setAt = new Date().toISOString(); st.editing = false; app.commit(); } }, road.currentUnit === null ? 'Build my road to a 5' : 'Save'),
     ),
   );
 }
@@ -514,7 +541,7 @@ function taskRow(app, course, info, act, t, wk, isDone, road, st, live) {
   );
 }
 
-function weekCard(app, course, info, act, wk, isDone, road, st) {
+function weekCard(app, course, info, act, wk, isDone, road, st, live, carry = []) {
   const n = wk.tasks.filter((t) => isDone(t, wk)).length;
   return el(
     'div',
@@ -524,6 +551,7 @@ function weekCard(app, course, info, act, wk, isDone, road, st) {
     el('div', { class: 'small faint' }, 'Tests, practice exams and study sessions tick themselves off when you do them in Orbit.'),
     wk.over > 0 && el('div', { class: 'small road-warn' }, `⚠️ A heavy week: about ${Math.round(wk.over / 6) / 10} h, so every unit gets covered before the exam.`),
     wk.tasks.map((t) => taskRow(app, course, info, act, t, wk, isDone, road, st, true)),
+    carry.length > 0 && el('div', { class: 'road-carry' }, el('b', { class: 'small' }, '↩ Catch up from earlier weeks'), carry.map(([t, w]) => taskRow(app, course, info, act, t, w, isDone, road, st, true))),
   );
 }
 
@@ -548,9 +576,42 @@ function scoreCard(course, info, mastery, tests) {
     { class: 'card road-score' },
     el('h3', {}, '🎯 What a 5 takes'),
     el('div', { class: 'road-est' }, el('div', { class: 'road-est-n' }, last ? `≈ ${last.apScore}` : '—'), el('div', { class: 'small muted' }, last ? `Latest estimate (${Math.round(last.pct)}% on a practice exam)` : 'Take a practice exam to get an estimate')),
+    trend(course),
     el('ul', { class: 'road-checks' }, checks.map(([ok, label]) => el('li', { class: ok ? 'ok' : '' }, el('span', { 'aria-hidden': 'true' }, ok ? '✅' : '⬜'), ` ${label}`))),
     el('div', { class: 'small faint' }, `Orbit estimates a 5 at about ${TARGET_PCT}% of practice-exam points. Real cut scores vary by subject and year, so aim above it.`),
   );
+}
+
+// Practice-exam scores over time against the 5 target line.
+function trend(course) {
+  const pts = course.exams.filter((e) => ['full', 'half', 'mcq'].includes(e.kind)).slice(-12);
+  if (pts.length < 2) return null;
+  const W = 260;
+  const H = 70;
+  const x = (i) => 6 + (i * (W - 12)) / (pts.length - 1);
+  const y = (p) => H - 6 - (Math.max(0, Math.min(100, p)) / 100) * (H - 12);
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', 'road-trend');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `Practice exam scores: ${pts.map((e) => `${Math.round(e.pct)}%`).join(', ')}; target ${TARGET_PCT}%`);
+  const line = (x1, y1, x2, y2, cls) => {
+    const l = document.createElementNS(NS, 'line');
+    Object.entries({ x1, y1, x2, y2, class: cls }).forEach(([k, v]) => l.setAttribute(k, v));
+    svg.append(l);
+  };
+  line(0, y(TARGET_PCT), W, y(TARGET_PCT), 'target');
+  const path = document.createElementNS(NS, 'polyline');
+  path.setAttribute('points', pts.map((e, i) => `${x(i)},${y(e.pct)}`).join(' '));
+  path.setAttribute('class', 'score');
+  svg.append(path);
+  pts.forEach((e, i) => {
+    const c = document.createElementNS(NS, 'circle');
+    Object.entries({ cx: x(i), cy: y(e.pct), r: 3, class: e.pct >= TARGET_PCT ? 'hit' : 'pt' }).forEach(([k, v]) => c.setAttribute(k, v));
+    svg.append(c);
+  });
+  return el('div', {}, svg, el('div', { class: 'small faint' }, `Practice exams over time · dashed line = ${TARGET_PCT}% (a 5)`));
 }
 
 function timeline(app, course, info, act, plan, thisWeek, isDone, road, st) {
