@@ -4371,3 +4371,180 @@ body:has(.shell.focus .bb) #toasts {
 .bb-key.wide2 {
   grid-column: span 2;
 }
+
+/* Road to a 5 */
+.road-warn {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #ffb020 16%, transparent);
+}
+.road-head h3,
+.road-week h3 {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.road-bar {
+  display: flex;
+  gap: 2px;
+  margin: 12px 0 10px;
+  height: 12px;
+}
+.road-bar span {
+  flex: 1;
+  border-radius: 3px;
+  opacity: 0.45;
+}
+.road-bar span.past {
+  opacity: 0.2;
+}
+.road-bar span.now {
+  opacity: 1;
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.road-phases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.road-phase {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pc);
+  background: var(--bg-2);
+}
+.road-phase.on {
+  border-color: var(--pc);
+  background: color-mix(in srgb, var(--pc) 10%, var(--panel));
+}
+.road-task {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.road-task-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.road-task-main .check {
+  margin-top: 2px;
+  flex: none;
+}
+.road-ic {
+  width: 22px;
+  flex: none;
+  text-align: center;
+}
+.road-task-text {
+  flex: 1;
+  min-width: 0;
+}
+.road-task.done .road-task-text > div:first-child {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.road-est {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.road-est-n {
+  font-size: 2.2em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.road-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.9em;
+}
+.road-checks li.ok {
+  color: var(--muted);
+}
+.road-month {
+  border-top: 1px solid var(--line);
+}
+.road-month-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 0;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+}
+.road-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.road-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.road-wk {
+  padding: 6px 0 6px 14px;
+  border-left: 3px solid var(--line);
+  margin: 0 0 8px 4px;
+}
+.road-wk.now {
+  border-left-color: var(--accent);
+}
+.road-wk .road-task {
+  padding: 4px 0;
+  font-size: 0.9em;
+}
+.video-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 6px;
+}
+.road-task .video-list,
+.road-topics {
+  margin-left: 32px;
+}
+.road-topics {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
+.road-videos select,
+.road-settings select {
+  width: 100%;
+  margin: 8px 0 0;
+}
+@media (max-width: 760px) {
+  .road-task-main {
+    flex-wrap: wrap;
+  }
+  .road-task-main > .row {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .road-task .video-list,
+  .road-topics {
+    margin-left: 0;
+  }
+  .road-head .road-phase > div:last-child {
+    display: none;
+  }
+  .road-head .road-phases {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+}

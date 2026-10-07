@@ -1156,6 +1156,8 @@ function renderLearn(app, s, set, top) {
     // Written correct = strong recall; choice correct = partial; wrong = again.
     if (!ok) grade(card, 0);
     else if (written) grade(card, 2);
+    const studied = s.setId && setById(app, s.setId);
+    if (studied) studied.lastStudied = new Date().toISOString(); // counts toward plan check-offs
     logStudy(app.data, { cards: 1, correct: ok ? 1 : 0, fresh: wasNew ? 1 : 0 });
     s.feedback = { ok, given, cardId: card.id, expected: p.a };
     app.commit();

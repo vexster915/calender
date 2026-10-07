@@ -12,6 +12,7 @@ import { logActivity, CLASS_COLORS } from './logic.js';
 import { catalogTiles } from './catalog.js';
 import { renderBluebook, renderBreak } from './bluebook.js';
 import { DV_SCHOOL, DV_COURSES } from './dvcatalog.js';
+import { renderRoad, buildRoad, roadInputs } from './road5.js';
 
 const dec = new TextDecoder();
 const enc = new TextEncoder();
@@ -177,7 +178,7 @@ function addStep2(app, st, m) {
             const course = createCourse(app, info, st.classId || null);
             m.close();
             confetti(window.innerWidth / 2, window.innerHeight / 3, 30);
-            app.go('course', { id: course.id, tab: 'units' });
+            app.go('course', { id: course.id, tab: 'road' });
           },
         },
         `Add ${info.name}`,
@@ -212,7 +213,7 @@ export function renderCourse(app) {
     app.view = 'courses';
     return renderCourses(app);
   }
-  st.tab ||= 'units';
+  st.tab ||= 'road';
   const info = infoOf(course);
   const L = links(info);
   const apExam = app.data.items.find((i) => i.classId === course.classId && i.type === 'exam' && /AP Exam/.test(i.title) && !i.done);
@@ -246,20 +247,21 @@ export function renderCourse(app) {
             'div',
             { class: 'stack', style: { gap: '6px', marginTop: '6px' } },
             el('div', { class: 'small' }, el('b', {}, `${Math.max(0, Math.ceil((new Date(apExam.due) - new Date()) / 86400000))} days`), ` to the AP Exam (${fmtDate(apExam.due)})`),
-            el('button', { class: 'btn sm primary', onclick: () => buildStudyPlan(app, course, apExam) }, course.planBuilt ? '🗺 Rebuild study plan' : '🗺 Build my study plan'),
+            el('button', { class: 'btn sm primary', onclick: () => app.go('course', { tab: 'road' }) }, '🏆 Road to a 5'),
           )
-        : el('button', { class: 'btn sm', style: { marginTop: '6px' }, onclick: () => addExamDate(app, course) }, '📅 Add AP exam date'),
+        : el('div', { class: 'stack', style: { gap: '6px', marginTop: '6px' } }, el('button', { class: 'btn sm primary', onclick: () => app.go('course', { tab: 'road' }) }, '🏆 Road to a 5'), el('button', { class: 'btn sm', onclick: () => addExamDate(app, course) }, '📅 Add AP exam date')),
     ),
   );
 
   const tabs = el(
     'div',
     { class: 'seg' },
-    [['units', `${info.unitWord || 'Unit'}s`], ['exam', 'Practice exams'], ['import', 'Import material'], ['format', 'Exam format & tips']].map(([k, l]) => el('button', { class: st.tab === k ? 'on' : '', onclick: () => app.go('course', { tab: k }) }, l)),
+    [['road', '🏆 Road to a 5'], ['units', `${info.unitWord || 'Unit'}s`], ['exam', 'Practice exams'], ['import', 'Import material'], ['format', 'Exam format & tips']].map(([k, l]) => el('button', { class: st.tab === k ? 'on' : '', onclick: () => app.go('course', { tab: k }) }, l)),
   );
 
   let body;
-  if (st.tab === 'units') body = unitsTab(app, course, info);
+  if (st.tab === 'road') body = renderRoad(app, course, info, roadActions(app, course, info, apExam), apExam);
+  else if (st.tab === 'units') body = unitsTab(app, course, info);
   else if (st.tab === 'exam') body = examTab(app, course, info);
   else if (st.tab === 'import') body = importTab(app, course, info);
   else body = formatTab(info);
@@ -272,54 +274,67 @@ export function renderCourse(app) {
   return el('div', {}, resume, header, el('div', { style: { marginBottom: '14px' } }, tabs), body);
 }
 
-// ------------------------------------------------------------------ Study plan → Planner
-// Spreads unit reviews over the weeks before the AP Exam (more sessions for heavily weighted and
-// weaker units), then switches to weekly full practice exams for the final stretch.
-function buildStudyPlan(app, course, apExam) {
-  const info = infoOf(course);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const examDay = new Date(apExam.due);
-  const days = Math.floor((examDay - today) / 86400000);
-  if (days < 3) return toast('The exam is too close for a plan — do a practice exam and review your mistakes.');
-  // Remove the previous plan's unfinished sessions.
-  app.data.items = app.data.items.filter((i) => !(i.apPlan === course.id && !i.done));
-  const at = (d, h) => {
-    const x = new Date(today);
-    x.setDate(x.getDate() + d);
-    x.setHours(h, 0, 0, 0);
-    return x;
+// ------------------------------------------------------------------ Road to a 5 → actions & Planner
+function roadActions(app, course, info, apExam) {
+  const setOf = (u) => unitSet(app, course, u);
+  const study = (u) => {
+    const set = setOf(u);
+    if (set && set.cards.length >= 2) startStudy(app, set.id, 'learn');
+    else if (set) app.go('set', { id: set.id });
   };
-  const item = (title, date, type, minutes, notes) => ({ id: uid(), title, type, classId: course.classId, due: date.toISOString(), estimateMin: minutes, weight: null, spentMin: 0, subtasks: [], plan: [{ id: uid(), day: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`, minutes, done: false }], notes, done: false, apPlan: course.id, createdAt: new Date().toISOString() });
-  const finalDays = Math.min(28, Math.floor(days / 3));
-  const reviewDays = days - finalDays;
-  const added = [];
+  return {
+    setOf,
+    topics: (u) => AP_TOPICS[course.key]?.[u] || [],
+    covered: (course.covered ||= {}),
+    masteryPct: (set) => mastery(set).pct,
+    study,
+    test: (u) => startExam(app, course, { kind: 'unit', unit: u }),
+    exam: (kind) => startExam(app, course, { kind }),
+    material: (u) => openAddMaterial(app, course, u),
+    mistakes: () => {
+      const set = app.data.sets.find((x) => x.courseId === course.id && x.mistakes);
+      if (set && set.cards.length >= 2) startStudy(app, set.id, 'learn');
+      else toast('No mistakes saved yet. Take a unit test or practice exam first; missed questions land here.');
+    },
+    daily: () => {
+      const ids = course.unitSets.filter((id) => setById(app, id)?.cards.length);
+      if (ids.length) startStudy(app, null, 'review', { setIds: ids, title: info.name });
+      else toast('Add material to a unit first.');
+    },
+    format: () => app.go('course', { tab: 'format' }),
+    setDate: () => addExamDate(app, course),
+    planner: () => roadToPlanner(app, course, info, apExam),
+  };
+}
 
-  // Priority per unit: exam weight × how much is still unmastered.
-  const units = info.units
-    .map((u, i) => ({ i, w: /not/i.test(u.weight) ? 0 : weightMid(u.weight) || 10 })) // skills-based units count equally
-    .filter((u) => u.w > 0)
-    .map((u) => {
-      const set = unitSet(app, course, u.i);
-      const m = set && set.cards.length ? mastery(set).pct / 100 : 0;
-      return { ...u, p: u.w * (1.15 - m) };
-    });
-  const slots = Math.max(units.length, Math.min(units.length * 3, Math.floor((reviewDays * 3) / 7)));
-  const per = allocate(slots, units.map((u) => u.p)).map((n) => Math.max(1, n));
-  const order = units.flatMap((u, k) => Array(per[k]).fill(u.i)).sort((a, b) => a - b);
-  order.forEach((ui, k) => {
-    const d = 1 + Math.floor((k * Math.max(1, reviewDays - 1)) / order.length);
-    added.push(item(`${info.name}: review ${unitLabel(info, ui)} — ${info.units[ui].title}`, at(d, 19), 'reading', 40, 'Orbit → AP & Courses: study the unit set, then take the unit test.'));
-  });
-  // Final stretch: a full practice exam every week, plus a mistakes session mid-week.
-  for (let d = reviewDays + 1; d < days; d += 7) {
-    added.push(item(`${info.name}: full practice exam`, at(Math.min(d + 2, days - 1), 9), 'exam', info.exam.reduce((t, s) => t + s.minutes, 0), 'Orbit → AP & Courses → Practice exams. Timed, like the real thing.'));
-    if (d + 5 < days) added.push(item(`${info.name}: review mistakes + weakest unit`, at(d + 5, 19), 'reading', 40, 'Use “Study my mistakes” and Focus next.'));
+// Puts the next four weeks of the plan into the Planner (replacing the previous plan's unfinished items).
+function roadToPlanner(app, course, info, apExam) {
+  const act = roadActions(app, course, info, apExam);
+  const { road, mastery: m, tests, weakest, examDate } = roadInputs(app, course, info, act, apExam);
+  const plan = buildRoad(info, { examDate, currentUnit: road.currentUnit, intensity: road.intensity, mastery: m, tests, weakest });
+  const horizon = Date.now() + 28 * 86400000;
+  app.data.items = app.data.items.filter((i) => !(i.apPlan === course.id && !i.done));
+  const added = [];
+  const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  for (const wk of plan.weeks) {
+    if (wk.start.getTime() > horizon) break;
+    const days = [];
+    for (let d = new Date(Math.max(wk.start, new Date().setHours(0, 0, 0, 0))); d <= wk.end; d = new Date(d.getTime() + 86400000)) days.push(d);
+    if (!days.length) continue;
+    const big = days.find((d) => d.getDay() === 6) || days.at(-1); // practice exams on Saturday
+    let k = 0;
+    for (const t of wk.tasks) {
+      if (t.kind === 'video' || (road.done[t.id] ?? false)) continue;
+      const day = ['full', 'half'].includes(t.kind) ? big : days[k++ % days.length];
+      const due = new Date(day);
+      due.setHours(['full', 'half'].includes(t.kind) ? 9 : 19, 0, 0, 0);
+      added.push({ id: uid(), title: `${info.name}: ${t.title}`, type: ['full', 'half', 'mcq', 'unittest', 'frq'].includes(t.kind) ? 'exam' : 'reading', classId: course.classId, due: due.toISOString(), estimateMin: t.minutes, weight: null, spentMin: 0, subtasks: [], plan: [{ id: uid(), day: dayKey(day), minutes: t.minutes, done: false }], notes: `Road to a 5 · ${t.why}`, done: false, apPlan: course.id, createdAt: new Date().toISOString() });
+    }
   }
   app.data.items.push(...added);
   course.planBuilt = new Date().toISOString();
   app.commit();
-  toast(`🗺 Added ${added.length} study sessions to your Planner, up to ${fmtDate(examDay)}`, { action: 'View', onAction: () => app.go('horizon') });
+  toast(`🗓 Added ${added.length} study sessions for the next 4 weeks to your Planner`, { action: 'View', onAction: () => app.go('horizon') });
 }
 
 // The unit most worth your time right now.
@@ -479,6 +494,7 @@ function examTab(app, course, info) {
         el('button', { class: 'btn primary', disabled: content < 8, onclick: () => startExam(app, course, { kind: 'full' }) }, 'Full-length exam'),
         el('button', { class: 'btn', disabled: content < 8, onclick: () => startExam(app, course, { kind: 'half' }) }, 'Half-length'),
         el('button', { class: 'btn', disabled: content < 8, onclick: () => startExam(app, course, { kind: 'mcq' }) }, 'Multiple choice only'),
+        el('button', { class: 'btn', disabled: content < 8, onclick: () => startExam(app, course, { kind: 'frq' }) }, 'Free-response drill'),
       ),
       content < 8 && el('div', { class: 'small muted' }, 'Add material to a few units first (Import material tab).'),
       el('div', { class: 'small faint' }, 'Units without material are skipped and their share goes to the others. Your score is converted to an estimated 1–5 — real cut scores vary by subject and year.'),
@@ -501,7 +517,7 @@ function examTab(app, course, info) {
             el(
               'div',
               { class: 'row', style: { padding: '8px 0', borderBottom: '1px solid var(--line)' } },
-              el('b', { style: { width: '170px' } }, e.kind === 'unit' ? `${unitLabel(info, e.unit)} test` : { full: 'Full exam', half: 'Half exam', mcq: 'MCQ section' }[e.kind]),
+              el('b', { style: { width: '170px' } }, e.kind === 'unit' ? `${unitLabel(info, e.unit)} test` : { full: 'Full exam', half: 'Half exam', mcq: 'MCQ section', frq: 'FRQ drill' }[e.kind]),
               el('span', { class: 'muted small', style: { width: '120px' } }, fmtDate(e.at)),
               el('span', { style: { flex: 1 } }, `MCQ ${e.mcq.right}/${e.mcq.total}${e.frq.max ? ` · FRQ ${e.frq.pts}/${e.frq.max}` : ''}`),
               el('b', {}, e.apScore ? `≈ ${e.apScore}` : `${Math.round(e.pct)}%`),
@@ -966,7 +982,7 @@ function buildExam(app, course, { kind, unit }) {
   const perQ = mcqSpecs.reduce((t, s) => t + s.minutes, 0) / mcqTotal;
   const unitsInScope = kind === 'unit' ? [unit] : info.units.map((_, i) => i);
   const available = unitsInScope.map((i) => (sets[i]?.questions || []).filter((q) => q.answer !== null).length + (sets[i]?.cards.length || 0));
-  const target = kind === 'unit' ? Math.min(20, available[0]) : Math.round(mcqTotal * scale);
+  const target = kind === 'frq' ? 0 : kind === 'unit' ? Math.min(20, available[0]) : Math.round(mcqTotal * scale);
   const weights = unitsInScope.map((i, k) => (available[k] ? weightMid(info.units[i].weight) || 1 : 0));
   const per = allocate(target, weights);
   const mcqItems = [];
@@ -1009,14 +1025,16 @@ function buildExam(app, course, { kind, unit }) {
 
   // --- free response ---
   if (kind !== 'mcq') {
-    const frqSpecs = info.exam.filter((s) => s.kind === 'frq');
+    let frqSpecs = info.exam.filter((s) => s.kind === 'frq');
+    // An FRQ drill is one question of one type, rotating through the exam's FRQ types.
+    if (kind === 'frq') frqSpecs = frqSpecs.length ? [frqSpecs[course.exams.filter((e) => e.kind === 'frq').length % frqSpecs.length]] : [];
     const loCards = unitsInScope.flatMap((u) => (sets[u]?.cards || []).filter((c) => c.kind === 'qa' && c.def.length > 60).map((c) => ({ c, u })));
     const bank = course.frqs.filter((f) => kind !== 'unit' || f.unit === null || f.unit === unit);
     let bankPool = shuffle(bank);
     let loPool = shuffle(loCards);
     const built = shuffle(info.prompts || []);
     for (const spec of frqSpecs) {
-      const count = kind === 'unit' ? 1 : Math.max(1, Math.round(spec.count * scale));
+      const count = kind === 'unit' || kind === 'frq' ? 1 : Math.max(1, Math.round(spec.count * scale));
       const items = [];
       for (let i = 0; i < count; i++) {
         if (bankPool.length) {
@@ -1041,7 +1059,7 @@ export function startExam(app, course, { kind, unit = null }) {
   const sections = buildExam(app, course, { kind, unit });
   if (!sections.length || !sections[0].items.length) return toast('Not enough material yet — add cards or questions to this unit first.');
   const info = infoOf(course);
-  const title = kind === 'unit' ? `${unitLabel(info, unit)} test — ${info.units[unit].title}` : `${info.name} · ${{ full: 'Full practice exam', half: 'Half-length practice exam', mcq: 'Multiple-choice practice' }[kind]}`;
+  const title = kind === 'unit' ? `${unitLabel(info, unit)} test — ${info.units[unit].title}` : `${info.name} · ${{ full: 'Full practice exam', half: 'Half-length practice exam', mcq: 'Multiple-choice practice', frq: 'Free-response drill' }[kind]}`;
   modal(
     kind === 'unit' ? 'Unit test' : 'Practice AP exam',
     (m) => {
@@ -1189,8 +1207,8 @@ function finalize(app, s) {
       if (card) grade(card, it.given === it.answer ? 2 : 0);
     }
   }
-  s.result = { right, total: mcqItems.length, pts, max, pct, byUnit, apScore: s.kind === 'unit' ? null : apEstimate(pct) };
-  course.exams.push({ at: new Date().toISOString(), kind: s.kind, unit: s.unit, mcq: { right, total: mcqItems.length }, frq: { pts, max }, pct, apScore: s.result.apScore });
+  s.result = { right, total: mcqItems.length, pts, max, pct, byUnit, apScore: s.kind === 'unit' || s.kind === 'frq' ? null : apEstimate(pct) };
+  course.exams.push({ at: new Date().toISOString(), kind: s.kind, unit: s.unit, mcq: { right, total: mcqItems.length }, frq: { pts, max }, pct, apScore: s.result.apScore, byUnit });
   if (course.exams.length > 60) course.exams = course.exams.slice(-60);
   logStudy(app.data, { cards: mcqItems.length, correct: right, minutes: Math.round((Date.now() - s.started) / 60000) });
   logActivity(app.data);

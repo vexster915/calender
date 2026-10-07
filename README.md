@@ -39,6 +39,24 @@ The catalog was checked line by line against the **2025–26 CEDs** for all 23 c
 
 **Regular classes:** your own PDFs come first. If you have none, the AP & Courses page suggests free, openly-licensed material for each class, such as an OpenStax textbook (downloadable PDF) and Khan Academy, which you can upload to make a study set.
 
+## Road to a 5
+
+Every AP course opens on **🏆 Road to a 5**: a week-by-week plan from today to exam day, built for a 5.
+
+- **Set up in 30 seconds.** Tell it which unit your class is on and how much time you have each week (Steady ≈2–3 h, Committed ≈3–5 h, All in ≈5–7 h). It uses your AP exam date from the Planner, or an estimate until you set one.
+- **Four phases, month by month:**
+  - 🌱 **Learn & keep up:** learn each unit as your class covers it. Older units come back on an expanding spaced schedule (1, 2, 4, 6 weeks), and a unit test follows the end of each unit.
+  - 🔁 **Content review** (about 9–6 weeks out): every unit is reviewed again, weighted by exam weight and how weak you are, with FRQ drills.
+  - 🏁 **Exam practice** (last month): a full timed practice exam every week, then your mistakes and weakest units.
+  - 🎯 **Exam week:** light review, timing and logistics.
+- **Fits the school year.** Winter break becomes catch-up time with no new units, and June/July weeks are optional summer prep. On a short runway it still covers every unit and warns you when a week needs more than your chosen pace.
+- **This week** lists each task with a button that starts it: Learn, unit test, FRQ drill, practice exam, Study my mistakes or the review queue. Tasks tick themselves off when you do them in Orbit, and you can tick anything by hand.
+- **Official topics** for each unit (from the CED) open from the task, with the same "covered" checkboxes as the Units tab.
+- **Review videos** for every unit: the College Board's AP Daily (in AP Classroom) and AP Daily: Live Review, plus the channels students rely on for each course (Heimler's History, Bozeman Science, Flipping Physics, Jacob Clifford, Mr. Sinn, The Organic Chemistry Tutor, Stats Medic and others) and Khan Academy. Links are searches, so they never go stale.
+- **What a 5 takes:** checkpoints (every unit learned and tested, 80%+ unit tests, three full practice exams, 72%+ on one), your latest estimated score, and subject-specific strategy (rubrics, FRQ habits, what to memorize).
+- **🗓 Put the next 4 weeks in my Planner** adds the sessions to your calendar.
+- **Free-response drills** (one timed FRQ, rotating through the exam's FRQ types) are also on the Practice exams tab.
+
 ## O'Connor course catalog
 
 Every course offered at **Sandra Day O'Connor High School** (Deer Valley Unified School District, Phoenix AZ) is built in: 274 courses from the district's 2026-27 Academic Planning Guide, with grades, credits, prerequisites and the district's descriptions. Go to **AP & Courses → Course catalog**, check the classes you take, and Orbit sets each one up:
@@ -184,6 +202,7 @@ js/cur-augment.js   standards goals and extra key terms layered onto the Orbit o
 js/azstandards.js   generated: Arizona standards (code, text, heading) used as learning goals
 js/terms-cte.js     key terms for each Arizona CTE program standard
 js/stdkit.js        helpers that turn standards into units, goals and cited sources
+js/road5.js         Road to a 5: multi-month AP plan engine, review videos, strategy, the plan tab
 js/bluebook.js      Bluebook-style exam interface: tools, navigator, review page, breaks, calculator
 js/ui.js            modals, toasts, confetti
 js/attach.js        screenshot upload, gallery, viewer, Files page
