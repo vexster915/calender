@@ -1,0 +1,6 @@
+{
+  "name": "lean",
+  "version": "0.1.0",
+  "description": "Keeps Claude Code cheap and on task: short working rules, caps on subagents and task lists, no whole-file reads of big files, and a context-size meter.",
+  "author": { "name": "vexster915" }
+}

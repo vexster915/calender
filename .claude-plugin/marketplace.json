@@ -1,0 +1,5 @@
+{
+  "name": "vexster915",
+  "owner": { "name": "vexster915" },
+  "plugins": [{ "name": "lean", "source": "./.claude/skills/lean" }]
+}
